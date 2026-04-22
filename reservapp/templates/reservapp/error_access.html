@@ -1,0 +1,140 @@
+{% extends 'reservapp/base.html' %}
+{% load static %}
+
+{% block title %}Access Denied - {{ room_name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="card shadow-lg mx-auto" style="max-width: 800px;">
+        <!-- Header Section -->
+        <div class="card-header text-center p-4" style="background: linear-gradient(45deg, #dc3545, #ff6b6b); color: white;">
+            <h4 class="mb-2">{{ room_name }}</h4>
+            <div class="d-flex align-items-center justify-content-center gap-2 mb-2">
+                <i class="fas fa-exclamation-circle"></i>
+                <span>ไม่สามารถเข้าใช้งานได้</span>
+            </div>
+        </div>
+
+        <!-- User Info Section -->
+        <div class="card-body border-bottom bg-light">
+            <div class="row align-items-center py-3">
+                <div class="col-auto">
+                    <div class="bg-white p-2 rounded-circle shadow-sm">
+                        <i class="fas fa-user-circle fa-2x text-primary"></i>
+                    </div>
+                </div>
+                <div class="col">
+                    <h5 class="mb-1">{{ user_name }}</h5>
+                    {% if user_type %}
+                        <span class="badge bg-info">{{ user_type }}</span>
+                    {% endif %}
+                    {% if user_ldap %}
+                        <small class="text-muted d-block">รหัสผู้ใช้: {{ user_ldap }}</small>
+                    {% endif %}
+                </div>
+                <div class="col-auto">
+                    <div class="text-end">
+                        <small class="text-muted d-block">สถานะการจอง</small>
+                        <span class="badge bg-danger">ไม่อยู่ในช่วงเวลาจอง</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Content Section -->
+        <div class="card-body p-4">
+            <div class="text-center">
+                <div class="mb-4">
+                    <i class="fas fa-clock" style="font-size: 64px; color: #dc3545;"></i>
+                </div>
+
+                <!-- Booking Time Info -->
+                {% if time_start and time_end %}
+                <div class="row justify-content-center mb-4">
+                    <div class="col-md-8">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="text-muted mb-3">เวลาที่ท่านจองไว้</h6>
+                                <div class="d-flex justify-content-center align-items-center gap-3">
+                                    <div class="text-center">
+                                        <div class="small text-muted">เริ่มต้น</div>
+                                        <h5 class="mb-0 text-primary">{{ time_start }} น.</h5>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-muted"></i>
+                                    <div class="text-center">
+                                        <div class="small text-muted">สิ้นสุด</div>
+                                        <h5 class="mb-0 text-primary">{{ time_end }} น.</h5>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="d-grid gap-3 col-md-6 mx-auto">
+                    <a href="{% url 'room_list' %}" class="btn btn-primary btn-lg" 
+                       style="background: linear-gradient(45deg, #0d6efd, #0dcaf0); border: none;">
+                        <i class="fas fa-list me-2"></i>
+                        กลับไปหน้ารายการห้อง
+                    </a>
+                    
+                </div>
+
+                <div class="mt-4">
+                    <div class="card bg-light border-0">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-3">
+                                <i class="fas fa-info-circle me-2"></i>คำแนะนำ
+                            </h6>
+                            <div class="row justify-content-center">
+                                <div class="col-md-8">
+                                    <ul class="list-unstyled text-start">
+                                        <li class="mb-2">
+                                            <i class="fas fa-check-circle text-primary me-2"></i>
+                                            - ตรวจสอบเวลาการจองของท่าน
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="fas fa-check-circle text-primary me-2"></i>
+                                            - ตรวจสอบสถานะการจองในระบบ
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="fas fa-check-circle text-primary me-2"></i>
+                                            - สอบถามเจ้าหน้าเคาร์เตอร์ชั้น1
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Styles -->
+<style>
+    .btn {
+        transition: all 0.3s ease;
+    }
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .card {
+        border: none;
+    }
+    .alert {
+        border-radius: 10px;
+    }
+    @media (max-width: 576px) {
+        .card-header {
+            padding: 2rem 1rem;
+        }
+        .btn-lg {
+            padding: 0.75rem 1rem;
+        }
+    }
+</style>
+{% endblock %}

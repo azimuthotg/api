@@ -1,0 +1,217 @@
+{% extends 'reservapp/base.html' %}
+
+{% load static %}
+
+{% block styles %}
+<style type="text/css">
+    /* พื้นหลังแบบครอบคลุมทั้งหน้า */
+    body {
+        background: url("{% static 'images/bg1.png' %}") no-repeat center center fixed;
+        background-size: cover;
+        height: 100vh;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Navbar styles */
+    .navbar {
+        background-color: rgba(255, 255, 255, 0.6); /* เพิ่มความโปร่งแสง */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* เพิ่มเงา */
+        padding: 10px;
+        z-index: 10;
+    }
+
+    .navbar .navbar-brand, 
+    .navbar .nav-link {
+        color: #333; /* ปรับสีข้อความให้กลมกลืนกับพื้นหลัง */
+    }
+
+    .navbar .navbar-toggler-icon {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='rgba(0,0,0,0.5)' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+    }
+
+    /* การจัดวาง Layout ของเนื้อหาหลัก */
+    .text-center {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-top: 10px; /* ลดระยะห่างจาก navbar เพื่อย้ายรูปขึ้น */
+    }
+
+    h1, h3 {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #333;
+    }
+
+    h1 {
+        font-size: 26px;
+        margin-bottom: 20px;
+    }
+
+    h3 {
+        font-size: 20px;
+        margin-top: 20px;
+        color: #555;
+    }
+
+    .img-thumbnail {
+        margin-top: 10px; /* ลดระยะห่างเพื่อย้ายรูปขึ้น */
+        border: 3px solid #FCA311;
+        padding: 5px;
+        border-radius: 50%;
+        width: 150px;
+        height: 150px;
+    }
+
+    .list-group {
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        margin-top: 15px; /* ลดระยะห่างระหว่างรูปโปรไฟล์และข้อมูล */
+    }
+
+    .list-group-item {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 16px;
+        border: none;
+        padding: 10px 20px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .list-group-item:last-child {
+        border-bottom: none;
+    }
+
+    .text-success {
+        color: #28a745;
+    }
+
+    .text-danger {
+        color: #dc3545;
+    }
+
+    #barcode {
+        margin-top: 15px; /* ลดระยะห่างของบาร์โค้ด */
+    }
+
+    svg {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* Mobile responsive adjustments */
+    @media (max-width: 600px) {
+        .list-group {
+            max-width: 100%;
+        }
+
+        h1 {
+            font-size: 22px; /* ลดขนาดฟอนต์สำหรับหน้าจอมือถือ */
+        }
+
+        .img-thumbnail {
+            width: 100px;
+            height: 100px; /* ลดขนาดรูปโปรไฟล์ในมือถือ */
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+    {% if user_type == "นักศึกษา" %}
+        <div class="text-center">
+            <!-- <h1 class="text-center">ยินดีต้อนรับคุณ{{ displayName }}</h1> -->
+            <img src="{{ pictureUrl }}" alt="Profile Picture" class="img-thumbnail" style="width: 150px; height: 150px; border-radius: 50%;">
+            <ul class="list-group text-left mx-auto" style="max-width: 500px;">
+                <li class="list-group-item">
+                    <img src="{% static 'images/authen.png' %}" alt="authen" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px;">
+                    <strong>ข้อมูล{{ user_type }}</strong>
+                </li>
+                <li class="list-group-item"><strong>เลขประจำตัวนักศึกษา: </strong>{{ user_info.student_code }}</li>
+                <li class="list-group-item"><strong>ชื่อ-นามสกุล:</strong> {{ user_info.prefix_name }}{{ user_info.student_name }} {{ user_info.student_surname }}</li>
+                <li class="list-group-item"><strong>สาขาวิชา:</strong> {{ user_info.program_name }}</li>
+                <li class="list-group-item"><strong>คณะ:</strong> {{ user_info.faculty_name }}</li>
+                <li class="list-group-item"><strong>ระดับ:</strong> {{ user_info.level_name }}</li>
+                <li class="list-group-item">
+                    {% if is_walai_member %}
+                        <p class="text-success"><strong>คุณเป็นสมาชิกของ Walai Autolib</strong></p>
+                    {% else %}
+                        <p class="text-danger"><strong>คุณไม่เป็นสมาชิกของ Walai Autolib</strong></p>
+                    {% endif %}
+                </li>
+                <li class="list-group-item">
+                    <svg id="barcode"></svg> <!-- ใช้ SVG สำหรับแสดงบาร์โค้ด -->
+                </li>
+            </ul>
+        </div>
+    {% elif user_type == "บุคลากรภายในมหาวิทยาลัย" %}
+        <div class="text-center">
+            <!-- <h1 class="text-center">ยินดีต้อนรับคุณ{{ displayName }}</h1> -->
+            <img src="{{ pictureUrl }}" alt="Profile Picture" class="img-thumbnail" style="width: 150px; height: 150px; border-radius: 50%;">
+            <ul class="list-group text-left mx-auto" style="max-width: 500px;">
+                <li class="list-group-item">
+                    <img src="{% static 'images/authen.png' %}" alt="authen" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 5px;">
+                    <strong>ข้อมูล{{ user_type }}</strong>
+                </li>
+                <li class="list-group-item"><strong>เลขประจำตัวประชาชน: </strong>{{ user_info.staffcitizenid }}</li>
+                <li class="list-group-item"><strong>ชื่อ-นามสกุล:</strong> {{ user_info.prefixfullname }}{{ user_info.staffname }} {{ user_info.staffsurname }}</li>
+                <li class="list-group-item"><strong>ตำแหน่ง:</strong> {{ user_info.posnameth }}</li>
+                <li class="list-group-item"><strong>คณะ/หน่วยงาน:</strong> {{ user_info.departmentname }}</li>
+                <li class="list-group-item"><strong>ประเภท:</strong> {{ user_info.stftypename }}</li>
+                <li class="list-group-item">
+                    {% if is_walai_member %}
+                        <p class="text-success"><strong>คุณเป็นสมาชิกของ Walai Autolib</strong></p>
+                    {% else %}
+                        <p class="text-danger"><strong>คุณไม่เป็นสมาชิกของ Walai Autolib</strong></p>
+                    {% endif %}
+                </li>
+                <li class="list-group-item">
+                    <svg id="barcode"></svg> <!-- ใช้ SVG สำหรับแสดงบาร์โค้ด -->
+                </li>
+            </ul>
+        </div>
+    {% else %}
+        <p>ไม่พบข้อมูลผู้ใช้</p>
+    {% endif %}
+
+    <!-- ถ้ามีค่า page ให้ทำการ redirect ไปยัง page หลังจากหน่วงเวลา 3 วินาที -->
+    {% if page %}
+    <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            var pageUrl = "{{ page }}";  // ดึงค่า page
+            setTimeout(function() {
+                window.location.href = pageUrl;  // ทำการ redirect ไปยัง page หลังจาก 3 วินาที
+            }, 3000);  // หน่วงเวลา 3000 มิลลิวินาที (3 วินาที)
+        });
+    </script>
+    {% endif %}
+
+    <!-- โหลด JsBarcode ผ่าน CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
+
+    <!-- สคริปต์สำหรับสร้างบาร์โค้ด -->
+    <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            var userType = "{{ user_type }}";  // ดึง user_type จากข้อมูล
+
+            // ตรวจสอบประเภทผู้ใช้
+            var studentCode = (userType === "นักศึกษา") ? "{{ user_info.student_code }}" : "{{ user_info.staffcitizenid }}";
+
+            // ตรวจสอบว่ามี studentCode ก่อนแสดงบาร์โค้ด
+            if (studentCode) {
+                // ใช้ JsBarcode เพื่อสร้างบาร์โค้ด
+                JsBarcode("#barcode", studentCode, {
+                    format: "CODE128",  // รูปแบบบาร์โค้ด (สามารถเปลี่ยนเป็นรูปแบบอื่นได้)
+                    width: 2,
+                    height: 50,
+                    displayValue: true  // แสดงค่า student_code หรือ staffcitizenid ใต้บาร์โค้ด
+                });
+            }
+        });
+    </script>
+
+{% endblock %}

@@ -1,0 +1,124 @@
+{% extends 'reservapp/base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+    <h1 class="text-center">ยินดีต้อนรับสู่ LibNPU App</h1>
+    <p class="text-center" id="status">Loading...</p>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ฟังก์ชันสำหรับดึง query parameters จาก URL
+            function getQueryParam(param) {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get(param);
+            }
+
+            // ตรวจสอบ session ที่ส่งมาจาก Django
+            const sessionUserId = "{{ request.session.userId|default:'' }}";
+            const sessionDisplayName = "{{ request.session.displayName|default:'' }}";
+            const sessionPictureUrl = "{{ request.session.pictureUrl|default:'' }}";
+            const sessionPage = "{{ request.session.page|default:'' }}";
+
+            // ถ้ามี session ครบทั้ง 4 ตัว
+            if (sessionUserId && sessionDisplayName && sessionPictureUrl && sessionPage) {
+                // ใช้ข้อมูลจาก session
+                document.getElementById("status").textContent = "Welcome, " + sessionDisplayName;
+
+                // สร้างฟอร์มและส่งข้อมูลจาก session ไปที่ server
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = "{% url 'home' %}";  // ส่งข้อมูลกลับไปที่ view ของ home
+
+                // เพิ่ม csrf token เพื่อป้องกันการโจมตี CSRF
+                const csrfToken = "{{ csrf_token }}";
+                const inputCsrf = document.createElement('input');
+                inputCsrf.type = 'hidden';
+                inputCsrf.name = 'csrfmiddlewaretoken';
+                inputCsrf.value = csrfToken;
+                form.appendChild(inputCsrf);
+
+                // เพิ่มข้อมูลจาก session ในฟอร์ม
+                const inputUserId = document.createElement('input');
+                inputUserId.type = 'hidden';
+                inputUserId.name = 'userId';
+                inputUserId.value = sessionUserId;
+                form.appendChild(inputUserId);
+
+                const inputDisplayName = document.createElement('input');
+                inputDisplayName.type = 'hidden';
+                inputDisplayName.name = 'displayName';
+                inputDisplayName.value = sessionDisplayName;
+                form.appendChild(inputDisplayName);
+
+                const inputPictureUrl = document.createElement('input');
+                inputPictureUrl.type = 'hidden';
+                inputPictureUrl.name = 'pictureUrl';
+                inputPictureUrl.value = sessionPictureUrl;
+                form.appendChild(inputPictureUrl);
+
+                const inputPage = document.createElement('input');
+                inputPage.type = 'hidden';
+                inputPage.name = 'page';
+                inputPage.value = sessionPage;
+                form.appendChild(inputPage);
+
+                // ส่งฟอร์มโดยอัตโนมัติ
+                document.body.appendChild(form);
+                form.submit();
+            } else {
+                // ถ้าไม่มี session ครบ ให้ดึงค่าจาก URL แทน
+                const userId = getQueryParam('userId');
+                const displayName = getQueryParam('displayName');
+                const pictureUrl = getQueryParam('pictureUrl');
+                const page = getQueryParam('page');
+
+                if (userId && displayName && pictureUrl && page) {
+                    // สร้างฟอร์มเพื่อส่งข้อมูลไปยัง server ผ่าน POST
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = "{% url 'home' %}";  // ส่งข้อมูลกลับไปที่ view ของ home
+
+                    // เพิ่ม csrf token เพื่อป้องกันการโจมตี CSRF
+                    const csrfToken = "{{ csrf_token }}";
+                    const inputCsrf = document.createElement('input');
+                    inputCsrf.type = 'hidden';
+                    inputCsrf.name = 'csrfmiddlewaretoken';
+                    inputCsrf.value = csrfToken;
+                    form.appendChild(inputCsrf);
+
+                    // เพิ่มข้อมูลจาก URL ในฟอร์ม
+                    const inputUserId = document.createElement('input');
+                    inputUserId.type = 'hidden';
+                    inputUserId.name = 'userId';
+                    inputUserId.value = userId;
+                    form.appendChild(inputUserId);
+
+                    const inputDisplayName = document.createElement('input');
+                    inputDisplayName.type = 'hidden';
+                    inputDisplayName.name = 'displayName';
+                    inputDisplayName.value = displayName;
+                    form.appendChild(inputDisplayName);
+
+                    const inputPictureUrl = document.createElement('input');
+                    inputPictureUrl.type = 'hidden';
+                    inputPictureUrl.name = 'pictureUrl';
+                    inputPictureUrl.value = pictureUrl;
+                    form.appendChild(inputPictureUrl);
+
+                    const inputPage = document.createElement('input');
+                    inputPage.type = 'hidden';
+                    inputPage.name = 'page';
+                    inputPage.value = page;
+                    form.appendChild(inputPage);
+
+                    // ส่งฟอร์มโดยอัตโนมัติ
+                    document.body.appendChild(form);
+                    form.submit();
+                } else {
+                    document.getElementById("status").textContent = "Missing parameters in the URL.";
+                }
+            }
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends 'reservapp/base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+    <h1 class="text-center">ยินดีต้อนรับสู่ LibNPU App</h1>
+    <p class="text-center" id="status">Loading...</p>
+
+    <!-- เพิ่ม LIFF SDK เพื่อเชื่อมต่อกับ LINE LIFF -->
+    <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ตรวจสอบว่ามีการประกาศ session สำหรับ userId, displayName, และ pictureUrl หรือไม่
+            const sessionUserId = "{{ request.session.userId|default:'' }}";
+            const sessionDisplayName = "{{ request.session.displayName|default:'' }}";
+            const sessionPictureUrl = "{{ request.session.pictureUrl|default:'' }}";
+
+            if (sessionUserId && sessionDisplayName && sessionPictureUrl) {
+                // ถ้ามี session อยู่แล้ว ให้แสดงข้อมูลโดยไม่ต้องเชื่อมต่อ LIFF
+                document.getElementById("status").textContent = "Welcome, " + sessionDisplayName;
+
+                // สร้างฟอร์มและส่งข้อมูลไปที่ server โดยใช้ข้อมูลจาก session
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = "{% url 'home' %}";  // ส่งข้อมูลกลับไปที่ view ของ home
+
+                // เพิ่ม csrf token เพื่อป้องกันการโจมตี CSRF
+                const csrfToken = "{{ csrf_token }}";
+                const inputCsrf = document.createElement('input');
+                inputCsrf.type = 'hidden';
+                inputCsrf.name = 'csrfmiddlewaretoken';
+                inputCsrf.value = csrfToken;
+                form.appendChild(inputCsrf);
+
+                // เพิ่มข้อมูลจาก session ในฟอร์ม
+                const inputUserId = document.createElement('input');
+                inputUserId.type = 'hidden';
+                inputUserId.name = 'userId';
+                inputUserId.value = sessionUserId;
+                form.appendChild(inputUserId);
+
+                const inputDisplayName = document.createElement('input');
+                inputDisplayName.type = 'hidden';
+                inputDisplayName.name = 'displayName';
+                inputDisplayName.value = sessionDisplayName;
+                form.appendChild(inputDisplayName);
+
+                const inputPictureUrl = document.createElement('input');
+                inputPictureUrl.type = 'hidden';
+                inputPictureUrl.name = 'pictureUrl';
+                inputPictureUrl.value = sessionPictureUrl;
+                form.appendChild(inputPictureUrl);
+
+                // เพิ่มฟอร์มลงใน body ของเอกสารและทำการ submit โดยอัตโนมัติ
+                document.body.appendChild(form);
+                form.submit();
+            } else {
+                // ถ้ายังไม่มี session ครบทุกตัว ให้ทำการเชื่อมต่อกับ LIFF
+                liff.init({ liffId: "2005939209-8lp790oQ" })
+                .then(() => {
+                    if (!liff.isLoggedIn()) {
+                        liff.login();  // ถ้ายังไม่ได้เข้าสู่ระบบ จะเรียกใช้การ login
+                    } else {
+                        liff.getProfile().then(profile => {
+                            const userId = profile.userId;
+                            const displayName = profile.displayName;
+                            const pictureUrl = profile.pictureUrl;
+
+                            // สร้างฟอร์มเพื่อส่ง userId ไปยัง server ผ่าน POST
+                            const form = document.createElement('form');
+                            form.method = 'POST';
+                            form.action = "{% url 'home' %}";  // ส่งข้อมูลกลับไปที่ view ของ home
+
+                            // เพิ่ม csrf token เพื่อป้องกันการโจมตี CSRF
+                            const csrfToken = "{{ csrf_token }}";
+                            const inputCsrf = document.createElement('input');
+                            inputCsrf.type = 'hidden';
+                            inputCsrf.name = 'csrfmiddlewaretoken';
+                            inputCsrf.value = csrfToken;
+                            form.appendChild(inputCsrf);
+
+                            // เพิ่ม userId ในฟอร์ม
+                            const inputUserId = document.createElement('input');
+                            inputUserId.type = 'hidden';
+                            inputUserId.name = 'userId';
+                            inputUserId.value = userId;
+                            form.appendChild(inputUserId);
+
+                            const inputDisplayName = document.createElement('input');
+                            inputDisplayName.type = 'hidden';
+                            inputDisplayName.name = 'displayName';
+                            inputDisplayName.value = displayName;
+                            form.appendChild(inputDisplayName);
+
+                            const inputPictureUrl = document.createElement('input');
+                            inputPictureUrl.type = 'hidden';
+                            inputPictureUrl.name = 'pictureUrl';
+                            inputPictureUrl.value = pictureUrl;
+                            form.appendChild(inputPictureUrl);
+
+                            // เพิ่มฟอร์มลงใน body ของเอกสารและทำการ submit โดยอัตโนมัติ
+                            document.body.appendChild(form);
+                            form.submit();
+                        }).catch(err => {
+                            document.getElementById("status").textContent = "Failed to get profile: " + err;
+                        });
+                    }
+                })
+                .catch(err => {
+                    document.getElementById("status").textContent = "LIFF Initialization failed: " + err;
+                });
+            }
+        });
+    </script>
+{% endblock %}

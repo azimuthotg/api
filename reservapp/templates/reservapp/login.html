@@ -1,0 +1,85 @@
+{% extends 'reservapp/base.html' %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+    <h1 class="text-center">Username/Password 
+        <br>ระบบอินเตอร์เน็ต
+    </h1>
+    <form method="POST" id="loginForm">
+        {% csrf_token %}
+        
+        <!-- ฟิลด์สำหรับกรอก userLdap -->
+        <div class="mb-3">
+            <label for="userLdap" class="form-label">Username</label>
+            <input type="text" class="form-control" id="userLdap" name="userLdap" required>
+        </div>
+    
+        <!-- ฟิลด์สำหรับกรอก PassLdap -->
+        <div class="mb-3">
+            <label for="passLdap" class="form-label">Password</label>
+            <input type="password" class="form-control" id="passLdap" name="passLdap" required>
+        </div>
+    
+        <!-- Dropdown list สำหรับเลือกประเภทผู้ใช้งาน -->
+        <div class="mb-3">
+            <label for="user_type" class="form-label">เลือกประเภทผู้ใช้งาน</label>
+            <select class="form-select" id="user_type" name="user_type" required>
+                <option value="นักศึกษา">นักศึกษา</option>
+                <option value="บุคลากรภายในมหาวิทยาลัย">บุคลากรภายในมหาวิทยาลัย</option>
+            </select>
+        </div>
+    
+        {% if error_message %}
+            <div class="alert alert-danger">{{ error_message }}</div>
+        {% endif %}
+    
+        <button type="button" class="btn btn-primary" id="loginButton">Login</button>
+    </form>
+
+    <!-- Bootstrap Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="confirmModalLabel">ยืนยันการเลือกประเภทผู้ใช้งาน</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            คุณเลือกประเภทผู้ใช้งานเป็น "<span id="selectedUserType"></span>" ถูกต้องแล้วใช่ไหม?
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+            <button type="button" class="btn btn-primary" id="confirmSubmit">ยืนยัน</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JavaScript สำหรับแสดง Bootstrap Modal -->
+    <script type="text/javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('loginForm');
+            const loginButton = document.getElementById('loginButton');
+            const confirmSubmit = document.getElementById('confirmSubmit');
+            const userTypeField = document.getElementById('user_type');
+            const selectedUserType = document.getElementById('selectedUserType');
+
+            // เมื่อกดปุ่ม Login แสดง Modal
+            loginButton.addEventListener('click', function() {
+                // ดึงค่าที่เลือกจาก dropdown
+                const userType = userTypeField.value;
+                selectedUserType.textContent = userType;
+
+                // แสดง modal
+                const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+                confirmModal.show();
+            });
+
+            // เมื่อกดปุ่ม "ยืนยัน" ใน modal
+            confirmSubmit.addEventListener('click', function() {
+                loginForm.submit(); // ส่งฟอร์ม
+            });
+        });
+    </script>
+{% endblock %}

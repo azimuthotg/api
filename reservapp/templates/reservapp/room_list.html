@@ -1,0 +1,23 @@
+{% extends 'reservapp/base.html' %}
+
+{% load static %}
+
+{% block title %}Room List{% endblock %}
+
+{% block content %}
+    <h1 class="text-center">Room List</h1>
+    <div class="container">
+        <div class="row">
+            {% for room in rooms %}
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">{{ room.name }}</h5>
+                            <a href="{% url 'room_control' room.id %}" class="btn btn-primary">Control {{ room.name }}</a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}

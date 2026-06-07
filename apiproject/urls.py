@@ -15,8 +15,12 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+import time
+
 from django.contrib import admin
 from django.urls import path,include
+from django.db import connection
+from django.http import JsonResponse
 from apiapp import views,views_v2
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import (
@@ -45,7 +49,27 @@ router_v2.register('library', views_v2.WalaiCheckUserViewSetV2, basename='walai-
 router_v2.register('mt', views_v2.MikroTikHotspotViewSetV2, basename='mikrotik_hotspot-v2')
 router_v2.register('iot', views_v2.SonoffControlViewSetV2, basename='sonoff_control-v2')# เปลี่ยนจาก 'sonoff' เป็น 'iot'
 
+# Health endpoint สำหรับ NMS Agent monitoring — plain Django view (เลี่ยง DRF auth/permission), public
+def health(request):
+    t0 = time.monotonic()
+    try:
+        connection.ensure_connection()
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+        db_status = 'ok'
+    except Exception as e:
+        db_status = f'error: {e}'
+    db_ms = round((time.monotonic() - t0) * 1000)
+    status = 'ok' if db_status == 'ok' else 'degraded'
+    return JsonResponse(
+        {'status': status, 'db': db_status, 'db_ms': db_ms},
+        status=200 if status == 'ok' else 503,
+    )
+
+
 urlpatterns = [
+    path('health/', health, name='nms_health'),  # NMS monitoring (บนสุด ไม่แตะ router)
+
     # ใช้ custom_api_root สำหรับหน้าแรกแทน router.urls
     #path('', custom_views, name='api-root'),
 

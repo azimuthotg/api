@@ -25,6 +25,16 @@ python manage.py createsuperuser
 
 There are no automated tests in this project.
 
+## Deployment
+
+Production is git-based via `deploy.ps1` (not copy-paste). Dev pushes to `origin/main`; on the prod server (`202.29.55.217`, RDP) run from the project root `C:\inetpub\wwwroot\NPUAPI\apiproject`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy.ps1
+```
+
+The script pulls `origin/main`, runs `migrate` + `collectstatic`, then recycles the IIS app pool `apiproject` (system Python `C:\Python312\python.exe`, wfastcgi). The site is bound to host `api.npu.ac.th` only — `localhost` requests return IIS 404. See README.md → "การ Deploy บน IIS" for first-time setup and details.
+
 ## Architecture
 
 ### Dual API Versioning

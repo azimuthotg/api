@@ -220,6 +220,7 @@ CORS_ALLOWED_ORIGINS = [
     'https://a.npu.world',
     'http://202.29.55.213',
     'https://202.29.55.213',
+    'https://202.29.55.218',
 ]
 
 # หรือใช้ regex pattern แทน

@@ -47,3 +47,6 @@ Thumbs.db
 # Backup settings files
 apiproject/settings27062025.py
 "apiproject/settings 21032568.py"
+
+# Deployment copies & dated backups (not source of truth — git history is)
+code_deploy/

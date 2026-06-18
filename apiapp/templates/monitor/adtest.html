@@ -30,15 +30,17 @@
         ⚠️ การทดสอบด้วย<strong>รหัสผิดหลายครั้งติดกัน</strong> อาจทำให้บัญชีถูกล็อกได้ — ทดสอบเท่าที่จำเป็น
     </div>
 
-    <form method="post" action="{% url 'monitor_adtest' %}" class="card card-body mb-4">
+    <form method="post" action="{% url 'monitor_adtest' %}" class="card card-body mb-4" autocomplete="off">
         {% csrf_token %}
         <div class="mb-3">
             <label class="form-label">Username (รหัสนักศึกษา / บุคลากร)</label>
-            <input type="text" name="username" value="{{ username }}" class="form-control" autofocus required>
+            <input type="text" name="username" value="{{ username }}" class="form-control"
+                   autocomplete="off" autofocus required>
         </div>
         <div class="mb-3">
             <label class="form-label">Password (รหัสอินเทอร์เน็ต)</label>
-            <input type="password" name="password" class="form-control" required>
+            <input type="password" name="password" class="form-control"
+                   autocomplete="new-password" required>
         </div>
         <button type="submit" class="btn btn-primary">ทดสอบกับ AD</button>
     </form>

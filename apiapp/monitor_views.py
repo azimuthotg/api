@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from apiapp.models import BindingLog
+from apiapp.monitoring import check_ad_detailed
 
 SESSION_KEY = 'monitor_authed'
 
@@ -22,6 +23,12 @@ REASON_LABELS = {
     'ok': 'สำเร็จ',
     'invalid_credentials': 'รหัสผ่านไม่ถูกต้อง / ไม่มีบัญชีใน AD',
     'not_in_ad': 'ไม่พบบัญชีใน AD',
+    'account_locked': 'บัญชีถูกล็อก (กรอกผิดหลายครั้ง)',
+    'account_disabled': 'บัญชีถูกปิดใช้งาน',
+    'password_expired': 'รหัสผ่านหมดอายุ',
+    'must_reset_password': 'ต้องเปลี่ยนรหัสก่อนใช้งาน',
+    'account_expired': 'บัญชีหมดอายุ',
+    'ad_denied': 'AD ไม่อนุญาต (เวลา/เครื่อง)',
     'ad_error': 'เชื่อมต่อ AD ไม่ได้ (network/AD ล่ม)',
     'db_not_found': 'ไม่พบข้อมูลในฐานข้อมูล',
     'missing_input': 'กรอกข้อมูลไม่ครบ',
@@ -57,6 +64,37 @@ def monitor_login(request):
 def monitor_logout(request):
     request.session.pop(SESSION_KEY, None)
     return redirect('monitor_login')
+
+
+@require_http_methods(["GET", "POST"])
+def monitor_adtest(request):
+    """หน้าทดสอบ login กับ AD สำหรับเจ้าหน้าที่หน้างาน
+
+    กรอก username + password แล้วยิงตรงไป AD ทันที เห็นผลว่าผ่าน/ไม่ผ่าน + สาเหตุ
+    (ถ้ารหัสถูกแต่บัญชีมีปัญหา จะเห็น code จริง เช่น ถูกปิด/รหัสหมดอายุ)
+    ไม่บันทึกลง BindingLog — เป็นเครื่องมือทดสอบเฉยๆ
+    """
+    if not _is_authed(request):
+        return redirect('monitor_login')
+
+    result = None
+    username = ''
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+        if not username or not password:
+            result = {'error': 'กรุณากรอก username และ password ให้ครบ'}
+        else:
+            success, info, reason_code, message = check_ad_detailed(username, password)
+            result = {
+                'success': success,
+                'reason_code': reason_code,
+                'reason_label': REASON_LABELS.get(reason_code, reason_code),
+                'message': message,
+                'info': info,
+            }
+
+    return render(request, 'monitor/adtest.html', {'result': result, 'username': username})
 
 
 def monitor_dashboard(request):

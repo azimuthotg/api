@@ -90,6 +90,7 @@ urlpatterns = [
     path('monitor/', monitor_views.monitor_dashboard, name='monitor_dashboard'),
     path('monitor/login/', monitor_views.monitor_login, name='monitor_login'),
     path('monitor/logout/', monitor_views.monitor_logout, name='monitor_logout'),
+    path('monitor/adtest/', monitor_views.monitor_adtest, name='monitor_adtest'),
 
     path('admin/', admin.site.urls),
     path('reserv/',include('reservapp.urls')),

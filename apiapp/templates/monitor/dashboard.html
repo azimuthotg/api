@@ -129,18 +129,18 @@
                             {% endif %}
                         </td>
                         <td class="small text-nowrap">{{ log.event_label|default:"-" }}</td>
-                        <td class="mono">{{ log.user_ldap|default:"-" }}</td>
+                        <td class="mono text-nowrap">
+                            {% if log.user_ldap %}
+                            <span>{{ log.user_ldap }}</span>
+                            <button type="button" class="btn btn-sm btn-light border copy-btn py-0 px-1"
+                                    title="คัดลอกรหัสไปทดสอบ AD" data-copy="{{ log.user_ldap }}">⧉</button>
+                            {% else %}-{% endif %}
+                        </td>
                         <td class="small">{{ log.display_name|default:"-" }}</td>
                         <td class="small">{{ log.user_type|default:"-" }}</td>
                         <td class="small">{{ log.reason_label|default:"-" }}</td>
                         <td class="reason-cell">
-                            {% if log.message %}
-                            <div class="d-flex align-items-start gap-1">
-                                <span class="small text-break">{{ log.message }}</span>
-                                <button type="button" class="btn btn-sm btn-light border copy-btn py-0 px-1" title="คัดลอก"
-                                        data-copy="{{ log.message }}">⧉</button>
-                            </div>
-                            {% else %}-{% endif %}
+                            {% if log.message %}<span class="small text-break">{{ log.message }}</span>{% else %}-{% endif %}
                         </td>
                         <td class="mono text-muted">{{ log.line_uid|default:"-"|truncatechars:14 }}</td>
                         <td class="mono small text-muted">{{ log.ip_address|default:"-" }}</td>
@@ -180,6 +180,13 @@
             });
         });
     });
+
+    // auto-refresh ทุก 5 วินาที — ข้ามถ้ากำลังพิมพ์ในช่องกรอง (กันรีโหลดทับสิ่งที่พิมพ์)
+    setInterval(function () {
+        var el = document.activeElement;
+        var typing = el && ['INPUT', 'SELECT', 'TEXTAREA'].indexOf(el.tagName) !== -1;
+        if (!typing) { location.reload(); }
+    }, 5000);
 </script>
 </body>
 </html>

@@ -12,6 +12,42 @@ class UserProfile(models.Model):
     def __str__(self):
         return f"UserProfile: {self.userId} - Ldap: {self.userLdap} - Type: {self.user_type}"
 
+class BindingLog(models.Model):
+    """บันทึกกิจกรรมการผูกบัญชี (LINE UID + LDAP) สำหรับหน้า Monitor
+
+    เก็บทุกครั้งที่มีการเรียก auth_ldap ไม่ว่าจะสำเร็จหรือไม่ พร้อมสาเหตุ
+    (reason_code) เพื่อให้เจ้าหน้าที่หน้างานเห็นว่าเกิดอะไรขึ้น
+    """
+    STATUS_SUCCESS = 'success'
+    STATUS_FAIL = 'fail'
+    STATUS_CHOICES = [
+        (STATUS_SUCCESS, 'สำเร็จ'),
+        (STATUS_FAIL, 'ไม่สำเร็จ'),
+    ]
+
+    # reason_code: ok | invalid_credentials | not_in_ad | ad_error | db_not_found | missing_input
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    event = models.CharField(max_length=30, default='ldap_auth')  # ldap_auth / auth_student / auth_personnel
+    line_uid = models.CharField(max_length=100, blank=True, null=True)
+    display_name = models.CharField(max_length=150, blank=True, null=True)
+    user_ldap = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    user_type = models.CharField(max_length=50, blank=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, db_index=True)
+    reason_code = models.CharField(max_length=50, blank=True, null=True)
+    message = models.TextField(blank=True, null=True)
+    ip_address = models.CharField(max_length=45, blank=True, null=True)
+    api_version = models.CharField(max_length=5, blank=True, null=True)
+
+    class Meta:
+        db_table = 'binding_log'
+        ordering = ['-created_at']
+        verbose_name = 'Binding Log'
+        verbose_name_plural = 'Binding Logs'
+
+    def __str__(self):
+        return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.user_ldap} - {self.status} ({self.reason_code})"
+
+
 class StudentsInfo(models.Model):
     student_code = models.CharField(max_length=50, blank=True, null=False,primary_key=True)  # กำหนดให้ student_code เป็น primary key
     prefix_name = models.CharField(max_length=50, blank=True, null=True)

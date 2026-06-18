@@ -10,6 +10,7 @@ from rest_framework.decorators import action,api_view
 import requests
 from django.conf import settings  # เพิ่มบรรทัดนี้
 from django.http import HttpResponse
+from apiapp.monitoring import check_ad_detailed, log_binding, BindLoggingCreateMixin
 
 
 
@@ -24,10 +25,11 @@ from django.http import HttpResponse
 # MIKROTIK_PASSWORD = '41132834@ake@1'  # แทนที่ด้วยรหัสผ่านของ MikroTik
 #----------------------------------------------
 
-class userViewset(viewsets.ModelViewSet):
+class userViewset(BindLoggingCreateMixin, viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer
     lookup_field = 'userId'
+    bind_api_version = 'v1'
 
 class StudentsInfoViewset(viewsets.ModelViewSet):
     queryset = StudentsInfo.objects.all()
@@ -46,28 +48,9 @@ def restricted_api_root(request, format=None):
 
 #---------------------------------------------
 def check_user_in_ad(userLdap, passLdap):
-    try:
-        # สร้างการเชื่อมต่อไปยัง AD
-        server = Server(settings.LDAP_SERVER, get_info=ALL)
-        conn = Connection(server, user=f'{settings.DOMAIN_NAME}\\{userLdap}', password=passLdap, authentication=NTLM, auto_bind=True)
-
-        if conn.bind():
-            # ถ้าการเชื่อมต่อสำเร็จ ดึงข้อมูลจาก AD
-            conn.search(f'dc={settings.DOMAIN_NAME.split(".")[0]},dc={settings.DOMAIN_NAME.split(".")[1]}', f'(sAMAccountName={userLdap})', attributes=['displayName', 'mail'])
-
-            if conn.entries:
-                ldap_info = {
-                    'displayName': conn.entries[0].displayName.value,
-                    'email': conn.entries[0].mail.value if conn.entries[0].mail else None
-                }
-                return True, ldap_info
-            else:
-                return False, None
-        else:
-            return False, None
-    except Exception as e:
-        print(f"Error connecting to AD: {e}")
-        return False, None
+    # delegate ไปยัง check_ad_detailed (source of truth เดียว) แล้วคืน signature เดิม
+    success, ldap_info, _reason, _message = check_ad_detailed(userLdap, passLdap)
+    return success, ldap_info
 
 #---------------------------------------------
 class LDAPAuthViewSet(viewsets.ViewSet):
@@ -76,12 +59,32 @@ class LDAPAuthViewSet(viewsets.ViewSet):
     def auth_ldap(self, request):
         user_ldap = request.data.get('userLdap')
         pass_ldap = request.data.get('passLdap')
+        # ข้อมูล LINE (ถ้า frontend ส่งมา) สำหรับเชื่อมโยงใน Monitor
+        line_uid = request.data.get('line_uid') or request.data.get('userId')
+        display_name = request.data.get('display_name') or request.data.get('displayName')
+        user_type = request.data.get('user_type')
 
         if not user_ldap or not pass_ldap:
+            log_binding(
+                request, event='ldap_auth', user_ldap=user_ldap,
+                status='fail', reason_code='missing_input',
+                message='ไม่ได้ส่ง userLdap หรือ passLdap',
+                line_uid=line_uid, display_name=display_name,
+                user_type=user_type, api_version='v1',
+            )
             return Response({'detail': 'Missing userLdap or passLdap'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # เรียกใช้ฟังก์ชันตรวจสอบ AD
-        success, ldap_info = check_user_in_ad(user_ldap, pass_ldap)
+        # เรียกใช้ฟังก์ชันตรวจสอบ AD (แบบมีสาเหตุ)
+        success, ldap_info, reason_code, message = check_ad_detailed(user_ldap, pass_ldap)
+
+        log_binding(
+            request, event='ldap_auth', user_ldap=user_ldap,
+            status='success' if success else 'fail',
+            reason_code=reason_code, message=message,
+            line_uid=line_uid,
+            display_name=display_name or (ldap_info.get('displayName') if ldap_info else None),
+            user_type=user_type, api_version='v1',
+        )
 
         if success:
             return Response({'success': True, 'ldap_info': ldap_info}, status=status.HTTP_200_OK)

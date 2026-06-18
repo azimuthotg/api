@@ -26,6 +26,7 @@ env = environ.Env(
     DB_PASSWORD=(str, '41132834'),
     DB_HOST=(str, '202.29.55.213'),
     DB_PORT=(str, '3306'),
+    MONITOR_PASSWORD=(str, 'npulib'),  # รหัสผ่านร่วมหน้า Monitor (override ใน .env)
 )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -44,6 +45,9 @@ SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env('ALLOWED_HOSTS').split(',')
+
+# รหัสผ่านร่วมสำหรับหน้า Monitor การผูกบัญชี (บรรณารักษ์เคาน์เตอร์ดูเฉยๆ)
+MONITOR_PASSWORD = env('MONITOR_PASSWORD')
 
 
 # Application definition

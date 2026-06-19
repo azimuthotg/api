@@ -42,6 +42,42 @@ EVENT_LABELS = {
     'bind': '2. ผูกบัญชี',
 }
 
+# ป้ายตาม HTTP-based reason_code (สำหรับ ApiAccessLog ที่ไม่มีสาเหตุ AD)
+ACCESS_REASON_LABELS = {
+    'ok': 'สำเร็จ',
+    'unauthorized': 'ไม่ได้ส่ง token หรือ token ไม่ถูกต้อง',
+    'forbidden': 'ไม่มีสิทธิ์เรียก endpoint นี้',
+    'not_found': 'ไม่พบข้อมูล',
+    'bad_request': 'ส่งข้อมูลไม่ครบ/ไม่ถูกต้อง',
+    'method_not_allowed': 'เรียกผิดวิธี (HTTP method)',
+    'too_many_requests': 'เรียกถี่เกินไป',
+    'server_error': 'เซิร์ฟเวอร์ผิดพลาด',
+}
+
+# แปลข้อความ (detail) เฉพาะที่ endpoint ส่งมา → คำอธิบายไทยกระชับชัดเจน
+ACCESS_MESSAGE_LABELS = {
+    'Personnel not found': 'ผ่าน AD แล้ว แต่ไม่พบในฐานข้อมูลบุคลากร',
+    'Student not found': 'ผ่าน AD แล้ว แต่ไม่พบในฐานข้อมูลนักศึกษา',
+    'Invalid credentials': 'รหัสผ่านไม่ถูกต้อง หรือไม่มีบัญชีใน AD',
+    'Invalid credentials or user not found in AD': 'รหัสผ่านไม่ถูกต้อง หรือไม่มีบัญชีใน AD',
+    'Missing userLdap or passLdap': 'ส่งข้อมูลไม่ครบ (ไม่มี username/password)',
+    'Missing username or password': 'ส่งข้อมูลไม่ครบ (ไม่มี username/password)',
+}
+
+
+def _access_explain(log):
+    """คำอธิบายสาเหตุไทยกระชับสำหรับ 1 แถวของ ApiAccessLog (ไล่จากเจาะจงสุด)"""
+    # 1) สาเหตุ AD ละเอียด (จาก auth_ldap) มีใน REASON_LABELS อยู่แล้ว เช่น บัญชีถูกล็อก
+    if log.reason_code in REASON_LABELS:
+        return REASON_LABELS[log.reason_code]
+    # 2) ข้อความเฉพาะจาก endpoint เช่น Personnel not found
+    if log.message and log.message in ACCESS_MESSAGE_LABELS:
+        return ACCESS_MESSAGE_LABELS[log.message]
+    # 3) ตาม HTTP status
+    if log.reason_code in ACCESS_REASON_LABELS:
+        return ACCESS_REASON_LABELS[log.reason_code]
+    return log.reason_code or '-'
+
 
 def _is_authed(request):
     return request.session.get(SESSION_KEY) is True
@@ -270,7 +306,7 @@ def monitor_api_usage(request):
     page_obj = paginator.get_page(request.GET.get('page'))
 
     for log in page_obj:
-        log.reason_label = REASON_LABELS.get(log.reason_code, log.reason_code)
+        log.reason_label = _access_explain(log)
 
     params = request.GET.copy()
     params.pop('page', None)

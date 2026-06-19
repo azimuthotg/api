@@ -23,11 +23,11 @@ from django.db import connection
 from django.http import JsonResponse
 from apiapp import views,views_v2
 from apiapp import monitor_views
-from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
+from apiapp.token_views import (
+    LoggingTokenObtainPairView,
+    LoggingTokenRefreshView,
 )
+from rest_framework.routers import DefaultRouter
 
 # Router สำหรับ API v1 (เดิม)
 router = DefaultRouter()
@@ -83,14 +83,16 @@ urlpatterns = [
     # API v2 (ใหม่)
     path('v2/', include(router_v2.urls)),
     # JWT Authentication endpoints (เฉพาะ v2)
-    path('v2/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('v2/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('v2/token/', LoggingTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('v2/token/refresh/', LoggingTokenRefreshView.as_view(), name='token_refresh'),
 
     # หน้า Monitor การผูกบัญชี (รหัสผ่านร่วม)
     path('monitor/', monitor_views.monitor_dashboard, name='monitor_dashboard'),
     path('monitor/login/', monitor_views.monitor_login, name='monitor_login'),
     path('monitor/logout/', monitor_views.monitor_logout, name='monitor_logout'),
     path('monitor/adtest/', monitor_views.monitor_adtest, name='monitor_adtest'),
+    path('monitor/token/', monitor_views.monitor_token_inspect, name='monitor_token_inspect'),
+    path('monitor/tokens/', monitor_views.monitor_token_log, name='monitor_token_log'),
 
     path('admin/', admin.site.urls),
     path('reserv/',include('reservapp.urls')),

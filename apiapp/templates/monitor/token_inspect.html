@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ตรวจ JWT token</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f5f6f8; }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; word-break: break-all; }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1">🔍 ตรวจ JWT token</span>
+        <div class="d-flex gap-2">
+            <a href="{% url 'monitor_token_log' %}" class="btn btn-sm btn-info">⏱ Token ระบบ</a>
+            <a href="{% url 'monitor_dashboard' %}" class="btn btn-sm btn-outline-light">← กลับหน้า Monitor</a>
+            <a href="{% url 'monitor_logout' %}" class="btn btn-sm btn-outline-light">ออกจากระบบ</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4" style="max-width: 720px;">
+    <p class="text-muted small">
+        วาง JWT token (access หรือ refresh) ที่ระบบใช้งานอยู่ลงในช่อง แล้วระบบจะแกะดูว่าเป็นของ user ไหน
+        ออกเมื่อไหร่ และ<strong>หมดอายุเมื่อไหร่</strong> — ใช้ตรวจเวลาระบบล่มว่าเป็นเพราะ token หมดหรือไม่
+        (ตรวจ token ที่หมดอายุไปแล้วก็ได้)
+    </p>
+
+    <form method="post" action="{% url 'monitor_token_inspect' %}" class="card card-body mb-4">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label class="form-label">JWT token</label>
+            <textarea name="token" rows="4" class="form-control mono" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autofocus required>{{ token }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">ตรวจ token</button>
+    </form>
+
+    {% if result %}
+        {% if not result.valid %}
+            <div class="card border-danger">
+                <div class="card-header text-bg-danger fw-bold">❌ แกะ token ไม่ได้</div>
+                <div class="card-body">{{ result.error }}</div>
+            </div>
+        {% else %}
+            {% if result.status_code == 'expired' %}
+                <div class="alert alert-danger fw-bold">⛔ token นี้หมดอายุแล้ว (หมดมา {{ result.overdue_days }} วัน) — ระบบที่ใช้ token นี้จะเข้าไม่ได้</div>
+            {% elif result.status_code == 'soon' %}
+                <div class="alert alert-warning fw-bold">⚠️ token นี้ใกล้หมดอายุ — เหลืออีก {{ result.days_left }} วัน ควรต่ออายุก่อน</div>
+            {% elif result.status_code == 'ok' %}
+                <div class="alert alert-success fw-bold">✅ token ยังใช้งานได้ — เหลืออีก {{ result.days_left }} วัน</div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr><th style="width:160px;">ประเภท</th><td>{{ result.token_type|default:"-" }}</td></tr>
+                            <tr><th>user_id</th><td class="mono">{{ result.user_id|default:"-" }}</td></tr>
+                            <tr><th>ออกเมื่อ (iat)</th><td>{{ result.issued_at|date:"Y-m-d H:i:s"|default:"-" }}</td></tr>
+                            <tr><th>หมดอายุ (exp)</th><td>{{ result.expires_at|date:"Y-m-d H:i:s"|default:"-" }}</td></tr>
+                            <tr><th>jti</th><td class="mono">{{ result.jti|default:"-" }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+</body>
+</html>

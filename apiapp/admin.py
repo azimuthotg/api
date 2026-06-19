@@ -1,10 +1,19 @@
 from django.contrib import admin
 # from app import models
-from apiapp.models import UserProfile,StudentsInfo,BindingLog
+from apiapp.models import UserProfile,StudentsInfo,BindingLog,TokenIssueLog
 
 # Register your models here.
 admin.site.register(UserProfile)
 admin.site.register(StudentsInfo)
+
+
+@admin.register(TokenIssueLog)
+class TokenIssueLogAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'event', 'username', 'issued_at', 'expires_at', 'ip_address')
+    list_filter = ('event',)
+    search_fields = ('username', 'user_id', 'jti', 'ip_address')
+    date_hierarchy = 'created_at'
+    readonly_fields = [f.name for f in TokenIssueLog._meta.fields]
 
 
 @admin.register(BindingLog)

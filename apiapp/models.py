@@ -48,6 +48,40 @@ class BindingLog(models.Model):
         return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.user_ldap} - {self.status} ({self.reason_code})"
 
 
+class TokenIssueLog(models.Model):
+    """บันทึกทุกครั้งที่ API ออก JWT (obtain / refresh) สำหรับหน้า Monitor
+
+    JWT เป็น stateless — ปกติไม่มี record ว่าใครได้ token ไปเมื่อไหร่/หมดเมื่อไหร่
+    โมเดลนี้เก็บไว้เพื่อให้เห็นล่วงหน้าว่า token ของระบบไหนใกล้หมดอายุ
+    (เคยเกิดเหตุระบบล่มเพราะ token หมดโดยไม่มีใครรู้)
+    """
+    EVENT_OBTAIN = 'obtain'
+    EVENT_REFRESH = 'refresh'
+    EVENT_CHOICES = [
+        (EVENT_OBTAIN, 'ขอใหม่ (login)'),
+        (EVENT_REFRESH, 'ต่ออายุ (refresh)'),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    event = models.CharField(max_length=10, choices=EVENT_CHOICES, default=EVENT_OBTAIN)
+    username = models.CharField(max_length=150, blank=True, null=True, db_index=True)
+    user_id = models.CharField(max_length=50, blank=True, null=True)
+    jti = models.CharField(max_length=64, blank=True, null=True)
+    issued_at = models.DateTimeField(blank=True, null=True)
+    expires_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    ip_address = models.CharField(max_length=45, blank=True, null=True)
+    user_agent = models.CharField(max_length=300, blank=True, null=True)
+
+    class Meta:
+        db_table = 'token_issue_log'
+        ordering = ['-created_at']
+        verbose_name = 'Token Issue Log'
+        verbose_name_plural = 'Token Issue Logs'
+
+    def __str__(self):
+        return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.username} - {self.event} (exp {self.expires_at:%Y-%m-%d})"
+
+
 class StudentsInfo(models.Model):
     student_code = models.CharField(max_length=50, blank=True, null=False,primary_key=True)  # กำหนดให้ student_code เป็น primary key
     prefix_name = models.CharField(max_length=50, blank=True, null=True)

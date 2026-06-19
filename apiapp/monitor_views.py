@@ -13,8 +13,9 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from apiapp.models import BindingLog
+from apiapp.models import BindingLog, TokenIssueLog
 from apiapp.monitoring import check_ad_detailed
+from apiapp.token_utils import decode_token
 
 SESSION_KEY = 'monitor_authed'
 
@@ -95,6 +96,115 @@ def monitor_adtest(request):
             }
 
     return render(request, 'monitor/adtest.html', {'result': result, 'username': username})
+
+
+# เกณฑ์เตือน "ใกล้หมดอายุ" (วัน)
+TOKEN_SOON_DAYS = 30
+
+
+def _token_status(expires_at):
+    """คืน (status_code, days_left) สำหรับ token: expired / soon / ok / unknown"""
+    if expires_at is None:
+        return 'unknown', None
+    now = timezone.now()
+    days_left = (expires_at - now).days
+    if expires_at <= now:
+        return 'expired', days_left
+    if days_left <= TOKEN_SOON_DAYS:
+        return 'soon', days_left
+    return 'ok', days_left
+
+
+@require_http_methods(["GET", "POST"])
+def monitor_token_inspect(request):
+    """วาง JWT แล้วดูว่าเป็นของ user ไหน / ออกเมื่อไหร่ / หมดเมื่อไหร่ / เหลือกี่วัน
+
+    decode แบบตรวจ signature แต่ไม่เช็ค exp — จึงดู token ที่หมดอายุไปแล้วได้
+    (ช่วยวินิจฉัยเวลาระบบล่มเพราะ token หมด)
+    """
+    if not _is_authed(request):
+        return redirect('monitor_login')
+
+    result = None
+    token = ''
+    if request.method == 'POST':
+        token = request.POST.get('token', '').strip()
+        info = decode_token(token)
+        if info.get('valid'):
+            status_code, days_left = _token_status(info.get('expires_at'))
+            info['status_code'] = status_code
+            info['days_left'] = days_left
+            info['overdue_days'] = abs(days_left) if days_left is not None and days_left < 0 else None
+        result = info
+
+    return render(request, 'monitor/token_inspect.html', {'result': result, 'token': token})
+
+
+def monitor_token_log(request):
+    """Dashboard token ที่ออกไป — สรุป 'token ล่าสุดของแต่ละ user หมดเมื่อไหร่'
+
+    เรียงตามใกล้หมดก่อน เพื่อให้เห็นว่าระบบไหนกำลังจะล่มก่อน
+    """
+    if not _is_authed(request):
+        return redirect('monitor_login')
+
+    # ---- สรุป token ล่าสุดต่อ user (ระบบที่ login ด้วย username เดียวกัน) ----
+    usernames = (
+        TokenIssueLog.objects.exclude(username__isnull=True)
+        .exclude(username='')
+        .values_list('username', flat=True)
+        .distinct()
+    )
+    latest_per_user = []
+    for u in usernames:
+        row = TokenIssueLog.objects.filter(username=u).order_by('-created_at').first()
+        if row is None:
+            continue
+        status_code, days_left = _token_status(row.expires_at)
+        latest_per_user.append({
+            'username': u,
+            'event': row.get_event_display(),
+            'issued_at': row.issued_at,
+            'expires_at': row.expires_at,
+            'ip_address': row.ip_address,
+            'status_code': status_code,
+            'days_left': days_left,
+            'overdue_days': abs(days_left) if days_left is not None and days_left < 0 else None,
+        })
+    # เรียง: หมดแล้ว/ใกล้หมดก่อน (วันเหลือน้อยขึ้นก่อน), unknown ไปท้าย
+    latest_per_user.sort(key=lambda r: (r['days_left'] is None, r['days_left'] if r['days_left'] is not None else 0))
+
+    summary = {
+        'users_total': len(latest_per_user),
+        'users_expired': sum(1 for r in latest_per_user if r['status_code'] == 'expired'),
+        'users_soon': sum(1 for r in latest_per_user if r['status_code'] == 'soon'),
+        'issues_total': TokenIssueLog.objects.count(),
+    }
+
+    # ---- รายการออก token ทั้งหมด (กรอง + แบ่งหน้า) ----
+    qs = TokenIssueLog.objects.all()
+    username_filter = request.GET.get('username', '').strip()
+    if username_filter:
+        qs = qs.filter(username__icontains=username_filter)
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    for row in page_obj:
+        row.status_code, row.days_left = _token_status(row.expires_at)
+
+    params = request.GET.copy()
+    params.pop('page', None)
+    base_query = params.urlencode()
+
+    context = {
+        'latest_per_user': latest_per_user,
+        'summary': summary,
+        'page_obj': page_obj,
+        'soon_days': TOKEN_SOON_DAYS,
+        'username_filter': username_filter,
+        'base_query': base_query,
+    }
+    return render(request, 'monitor/token_log.html', context)
 
 
 def monitor_dashboard(request):

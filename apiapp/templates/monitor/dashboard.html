@@ -19,6 +19,7 @@
         <span class="navbar-brand mb-0 h1">📋 Monitor การผูกบัญชี (LINE × LDAP)</span>
         <div class="d-flex align-items-center gap-2">
             <a href="?" class="btn btn-sm btn-outline-light">รีเฟรช</a>
+            <a href="{% url 'monitor_api_usage' %}" class="btn btn-sm btn-info">📡 การใช้งาน endpoint</a>
             <a href="{% url 'monitor_token_log' %}" class="btn btn-sm btn-info">⏱ Token ระบบ</a>
             <a href="{% url 'monitor_token_inspect' %}" class="btn btn-sm btn-outline-light">🔍 ตรวจ token</a>
             <a href="{% url 'monitor_adtest' %}" class="btn btn-sm btn-warning">🔑 ทดสอบ login AD</a>

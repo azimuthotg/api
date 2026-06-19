@@ -8,12 +8,12 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from apiapp.models import BindingLog, TokenIssueLog
+from apiapp.models import BindingLog, TokenIssueLog, ApiAccessLog
 from apiapp.monitoring import check_ad_detailed
 from apiapp.token_utils import decode_token
 
@@ -205,6 +205,91 @@ def monitor_token_log(request):
         'base_query': base_query,
     }
     return render(request, 'monitor/token_log.html', context)
+
+
+def monitor_api_usage(request):
+    """Dashboard การเรียกใช้ endpoint ตรวจสอบ/ดึงข้อมูล นศ.-บุคลากร
+
+    ตอบคำถาม "ระบบไหนเรียกเข้ามาบ้าง ผลเป็นยังไง" และค้นด้วยรหัส นศ./บุคลากร
+    เพื่อตอบ "ทำไมคนนี้จากระบบ X เข้าไม่ได้"
+    """
+    if not _is_authed(request):
+        return redirect('monitor_login')
+
+    qs = ApiAccessLog.objects.all()
+
+    # ---- ตัวกรอง ----
+    client_filter = request.GET.get('client_user', '').strip()
+    result_filter = request.GET.get('result', '')
+    version_filter = request.GET.get('api_version', '')
+    q = request.GET.get('q', '').strip()
+
+    if client_filter:
+        qs = qs.filter(client_user=client_filter)
+    if result_filter in (ApiAccessLog.RESULT_SUCCESS, ApiAccessLog.RESULT_FAIL):
+        qs = qs.filter(result=result_filter)
+    if version_filter:
+        qs = qs.filter(api_version=version_filter)
+    if q:
+        qs = qs.filter(
+            Q(target_user__icontains=q)
+            | Q(client_user__icontains=q)
+            | Q(client_ip__icontains=q)
+            | Q(endpoint__icontains=q)
+        )
+
+    # ---- สรุปวันนี้ ----
+    today = timezone.localtime().date()
+    today_qs = ApiAccessLog.objects.filter(created_at__date=today)
+    summary = {
+        'today_total': today_qs.count(),
+        'today_fail': today_qs.filter(result=ApiAccessLog.RESULT_FAIL).count(),
+        'today_systems': today_qs.exclude(client_user__isnull=True).values('client_user').distinct().count(),
+        'all_total': ApiAccessLog.objects.count(),
+    }
+
+    # ---- ภาพรวมต่อระบบ (7 วันล่าสุด) ----
+    since = timezone.now() - timedelta(days=7)
+    systems = list(
+        ApiAccessLog.objects.filter(created_at__gte=since)
+        .values('client_user')
+        .annotate(
+            total=Count('id'),
+            fails=Count('id', filter=Q(result=ApiAccessLog.RESULT_FAIL)),
+        )
+        .order_by('-total')[:20]
+    )
+
+    # ตัวเลือก client สำหรับ dropdown
+    client_choices = list(
+        ApiAccessLog.objects.exclude(client_user__isnull=True).exclude(client_user='')
+        .values_list('client_user', flat=True).distinct().order_by('client_user')
+    )
+
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    for log in page_obj:
+        log.reason_label = REASON_LABELS.get(log.reason_code, log.reason_code)
+
+    params = request.GET.copy()
+    params.pop('page', None)
+    base_query = params.urlencode()
+
+    context = {
+        'page_obj': page_obj,
+        'summary': summary,
+        'systems': systems,
+        'client_choices': client_choices,
+        'filters': {
+            'client_user': client_filter,
+            'result': result_filter,
+            'api_version': version_filter,
+            'q': q,
+        },
+        'base_query': base_query,
+    }
+    return render(request, 'monitor/api_usage.html', context)
 
 
 def monitor_dashboard(request):

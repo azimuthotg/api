@@ -82,6 +82,41 @@ class TokenIssueLog(models.Model):
         return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.username} - {self.event} (exp {self.expires_at:%Y-%m-%d})"
 
 
+class ApiAccessLog(models.Model):
+    """บันทึกการเรียกใช้ endpoint ตรวจสอบ/ดึงข้อมูล นศ.-บุคลากร สำหรับหน้า Monitor
+
+    หลายระบบภายนอกเรียก endpoint เหล่านี้ (login ตรวจ AD / ดึงข้อมูล) แต่ผู้ดูแล
+    มองไม่เห็นเลยว่า "ระบบไหน" เรียกเข้ามา ผลเป็นอย่างไร เวลาผู้ใช้มาถามว่า
+    "login จากระบบ X เข้าไม่ได้เพราะอะไร" จะได้สืบจาก log นี้ได้
+    ระบุระบบจาก client_user (บัญชี JWT ของระบบ) + ip + user_agent. ไม่เก็บรหัสผ่าน.
+    """
+    RESULT_SUCCESS = 'success'
+    RESULT_FAIL = 'fail'
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    client_user = models.CharField(max_length=150, blank=True, null=True, db_index=True)  # username ของ JWT (= ระบบที่เรียก)
+    client_ip = models.CharField(max_length=45, blank=True, null=True)
+    user_agent = models.CharField(max_length=300, blank=True, null=True)
+    api_version = models.CharField(max_length=5, blank=True, null=True)
+    endpoint = models.CharField(max_length=100, db_index=True)  # เช่น LDAPAuthViewSetV2.auth_ldap
+    method = models.CharField(max_length=8, blank=True, null=True)
+    target_user = models.CharField(max_length=100, blank=True, null=True, db_index=True)  # รหัส นศ./บุคลากร ที่ถูกตรวจ/ดึง
+    http_status = models.IntegerField(blank=True, null=True, db_index=True)
+    result = models.CharField(max_length=10, blank=True, null=True, db_index=True)  # success / fail
+    reason_code = models.CharField(max_length=50, blank=True, null=True)
+    message = models.TextField(blank=True, null=True)
+    duration_ms = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'api_access_log'
+        ordering = ['-created_at']
+        verbose_name = 'API Access Log'
+        verbose_name_plural = 'API Access Logs'
+
+    def __str__(self):
+        return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.client_user or self.client_ip} -> {self.endpoint} ({self.http_status})"
+
+
 class StudentsInfo(models.Model):
     student_code = models.CharField(max_length=50, blank=True, null=False,primary_key=True)  # กำหนดให้ student_code เป็น primary key
     prefix_name = models.CharField(max_length=50, blank=True, null=True)

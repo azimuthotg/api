@@ -11,6 +11,7 @@ import requests
 from django.conf import settings  # เพิ่มบรรทัดนี้
 from django.http import HttpResponse
 from apiapp.monitoring import check_ad_detailed, log_binding, BindLoggingCreateMixin
+from apiapp.access_log import ApiAccessLogMixin
 
 
 
@@ -31,15 +32,17 @@ class userViewset(BindLoggingCreateMixin, viewsets.ModelViewSet):
     lookup_field = 'userId'
     bind_api_version = 'v1'
 
-class StudentsInfoViewset(viewsets.ModelViewSet):
+class StudentsInfoViewset(ApiAccessLogMixin, viewsets.ModelViewSet):
     queryset = StudentsInfo.objects.all()
     serializer_class = StudentsInfoSerializer
     lookup_field = 'student_code'
+    access_log_api_version = 'v1'
 
-class StaffInfoViewSet(viewsets.ModelViewSet):
+class StaffInfoViewSet(ApiAccessLogMixin, viewsets.ModelViewSet):
     queryset = StaffInfo.objects.all()
     serializer_class = StaffInfoSerializer
     lookup_field = 'staffcitizenid'
+    access_log_api_version = 'v1'
 
 
 @api_view(['GET'])
@@ -53,7 +56,8 @@ def check_user_in_ad(userLdap, passLdap):
     return success, ldap_info
 
 #---------------------------------------------
-class LDAPAuthViewSet(viewsets.ViewSet):
+class LDAPAuthViewSet(ApiAccessLogMixin, viewsets.ViewSet):
+    access_log_api_version = 'v1'
 
     @action(detail=False, methods=['post'])
     def auth_ldap(self, request):
@@ -76,6 +80,7 @@ class LDAPAuthViewSet(viewsets.ViewSet):
 
         # เรียกใช้ฟังก์ชันตรวจสอบ AD (แบบมีสาเหตุ)
         success, ldap_info, reason_code, message = check_ad_detailed(user_ldap, pass_ldap)
+        request._api_access_reason = (reason_code, message)  # ส่งสาเหตุ AD เข้า ApiAccessLog ด้วย
 
         log_binding(
             request, event='ldap_auth', user_ldap=user_ldap,

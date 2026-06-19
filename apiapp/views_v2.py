@@ -18,6 +18,7 @@ from rest_framework.permissions import AllowAny
 # นำเข้า Authentication Mixins
 from apiapp.authentication import JWTV2Authentication, PublicEndpointAuthentication
 from apiapp.monitoring import check_ad_detailed, log_binding, BindLoggingCreateMixin
+from apiapp.access_log import ApiAccessLogMixin
 
 class UserViewSetV2(BindLoggingCreateMixin, JWTV2Authentication, viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
@@ -30,10 +31,11 @@ class UserViewSetV2(BindLoggingCreateMixin, JWTV2Authentication, viewsets.ModelV
     # - pagination ที่ปรับแต่งได้
     # - การค้นหาขั้นสูง
 
-class StudentsInfoViewSetV2(JWTV2Authentication, viewsets.ModelViewSet):
+class StudentsInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ModelViewSet):
     queryset = StudentsInfo.objects.all()
     serializer_class = StudentsInfoSerializerV2
     lookup_field = 'student_code'
+    access_log_api_version = 'v2'
     
     # เพิ่มความสามารถในการค้นหาด้วยชื่อหรือนามสกุล
     def get_queryset(self):
@@ -48,10 +50,11 @@ class StudentsInfoViewSetV2(JWTV2Authentication, viewsets.ModelViewSet):
             
         return queryset
 
-class StaffInfoViewSetV2(JWTV2Authentication, viewsets.ModelViewSet):
+class StaffInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ModelViewSet):
     queryset = StaffInfo.objects.all()
     serializer_class = StaffInfoSerializerV2
     lookup_field = 'staffcitizenid'
+    access_log_api_version = 'v2'
     
     # เพิ่มความสามารถในการค้นหาด้วยชื่อหรือตำแหน่ง
     def get_queryset(self):
@@ -134,10 +137,11 @@ class AuthViewSetV2(PublicEndpointAuthentication, viewsets.ViewSet):
         }, status=status.HTTP_200_OK)
 
 # คงเก็บไว้สำหรับความเข้ากันได้ย้อนหลัง แต่แยกเป็น class ต่างหาก
-class LDAPAuthViewSetV2(JWTV2Authentication, viewsets.ViewSet):
+class LDAPAuthViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ViewSet):
     """
     ViewSet สำหรับการตรวจสอบสิทธิ์ผ่าน LDAP (เก็บไว้สำหรับความเข้ากันได้ย้อนหลัง)
     """
+    access_log_api_version = 'v2'
     @action(detail=False, methods=['post'])
     def auth_ldap(self, request):
         """
@@ -162,6 +166,7 @@ class LDAPAuthViewSetV2(JWTV2Authentication, viewsets.ViewSet):
 
         # เรียกใช้ฟังก์ชันตรวจสอบ AD (แบบมีสาเหตุ)
         success, ldap_info, reason_code, message = check_ad_detailed(user_ldap, pass_ldap)
+        request._api_access_reason = (reason_code, message)  # ส่งสาเหตุ AD เข้า ApiAccessLog ด้วย
 
         log_binding(
             request, event='ldap_auth', user_ldap=user_ldap,

@@ -93,6 +93,7 @@ urlpatterns = [
     path('monitor/adtest/', monitor_views.monitor_adtest, name='monitor_adtest'),
     path('monitor/token/', monitor_views.monitor_token_inspect, name='monitor_token_inspect'),
     path('monitor/tokens/', monitor_views.monitor_token_log, name='monitor_token_log'),
+    path('monitor/api-usage/', monitor_views.monitor_api_usage, name='monitor_api_usage'),
 
     path('admin/', admin.site.urls),
     path('reserv/',include('reservapp.urls')),

@@ -42,6 +42,12 @@
             <input type="password" name="password" class="form-control"
                    autocomplete="new-password" required>
         </div>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="dump_attrs" value="1" id="dumpAttrs" checked>
+            <label class="form-check-label small" for="dumpAttrs">
+                ดึง attribute ทั้งหมดจาก AD (สำหรับหาตัวที่ map กับฐานข้อมูลบุคลากร — staffid / เลขบัตร ปชช.)
+            </label>
+        </div>
         <button type="submit" class="btn btn-primary">ทดสอบกับ AD</button>
     </form>
 
@@ -59,6 +65,33 @@
                     <div class="text-muted small mt-2">{{ result.message }}</div>
                 </div>
             </div>
+
+            {% if result.ad_attributes is not None %}
+                <div class="card mt-3">
+                    <div class="card-header fw-bold">📋 attribute ทั้งหมดที่ AD มีของ user นี้</div>
+                    <div class="card-body">
+                        <p class="small text-muted">
+                            มองหาตัวที่เป็น<strong>เลขบัตรประชาชน 13 หลัก</strong> หรือ<strong>รหัสบุคลากร</strong>
+                            (เช่น <code>employeeID</code>, <code>employeeNumber</code>, <code>pager</code>, <code>extensionAttribute*</code>)
+                            ถ้ามี จะเอามาใช้ค้น staff_info ได้
+                        </p>
+                        {% if result.ad_attributes %}
+                            <table class="table table-sm table-striped mono mb-0">
+                                <thead><tr><th style="width:240px;">attribute</th><th>ค่า</th></tr></thead>
+                                <tbody>
+                                    {% for k, v in result.ad_attributes.items %}
+                                        <tr><td>{{ k }}</td><td>{{ v|default:"-" }}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div class="text-muted">{{ result.ad_attributes_msg }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif result.ad_attributes_msg %}
+                <div class="alert alert-warning mt-3 small">ดึง attribute ไม่ได้: {{ result.ad_attributes_msg }}</div>
+            {% endif %}
         {% else %}
             <div class="card border-danger">
                 <div class="card-header text-bg-danger fw-bold">❌ ไม่ผ่าน</div>

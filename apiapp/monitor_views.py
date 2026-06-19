@@ -14,7 +14,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from apiapp.models import BindingLog, TokenIssueLog, ApiAccessLog
-from apiapp.monitoring import check_ad_detailed
+from apiapp.monitoring import check_ad_detailed, get_ad_user_attributes
 from apiapp.token_utils import decode_token
 
 SESSION_KEY = 'monitor_authed'
@@ -130,6 +130,12 @@ def monitor_adtest(request):
                 'message': message,
                 'info': info,
             }
+            # ถ้ารหัสผ่าน + ติ๊ก "ดึง attribute ทั้งหมด" -> ดึงทุก attribute มาช่วย diagnose
+            # ว่ามีตัวไหน map กับ staff_info (staffid / staffcitizenid) ได้
+            if success and request.POST.get('dump_attrs'):
+                ok, attrs, attr_msg = get_ad_user_attributes(username, password)
+                result['ad_attributes'] = attrs if ok else None
+                result['ad_attributes_msg'] = attr_msg
 
     return render(request, 'monitor/adtest.html', {'result': result, 'username': username})
 

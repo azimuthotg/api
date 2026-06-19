@@ -7,7 +7,7 @@
 import re
 
 from django.conf import settings
-from ldap3 import Server, Connection, ALL, NTLM
+from ldap3 import Server, Connection, ALL, ALL_ATTRIBUTES, NTLM
 from ldap3.core.exceptions import (
     LDAPSocketOpenError,
     LDAPException,
@@ -81,6 +81,51 @@ def check_ad_detailed(user_ldap, pass_ldap):
         return False, None, 'ad_error', f'เกิดข้อผิดพลาดจาก AD ({e})'
     except Exception as e:  # noqa: BLE001 - กันทุกกรณีไม่ให้ flow พัง
         return False, None, 'ad_error', f'เกิดข้อผิดพลาดไม่ทราบสาเหตุ ({e})'
+
+
+def get_ad_user_attributes(user_ldap, pass_ldap):
+    """bind ด้วยรหัสของผู้ใช้เอง แล้วดึง attribute "ทั้งหมด" ของ user นี้จาก AD
+
+    ใช้สำหรับ diagnose ว่ามี attribute ตัวไหนพอเอาไป map กับตาราง staff_info ได้
+    (เช่น employeeID / employeeNumber = เลขบัตร ปชช. หรือ รหัสบุคลากร)
+    คืน (success: bool, attributes: dict|None, message: str)
+    """
+    try:
+        server = Server(settings.LDAP_SERVER, get_info=ALL)
+        conn = Connection(
+            server,
+            user=f'{settings.DOMAIN_NAME}\\{user_ldap}',
+            password=pass_ldap,
+            authentication=NTLM,
+            auto_bind=False,
+        )
+        if not conn.bind():
+            return False, None, 'bind ไม่ผ่าน (รหัสผิด หรือบัญชีมีปัญหา)'
+
+        dc = settings.DOMAIN_NAME.split('.')
+        base_dn = f'dc={dc[0]},dc={dc[1]}'
+        conn.search(base_dn, f'(sAMAccountName={user_ldap})', attributes=ALL_ATTRIBUTES)
+        if not conn.entries:
+            return True, {}, 'bind ผ่าน แต่ไม่พบ entry ของ user นี้'
+
+        entry = conn.entries[0]
+        attrs = {}
+        for name in entry.entry_attributes:
+            try:
+                val = entry[name].value
+            except Exception:  # noqa: BLE001
+                val = None
+            # ตัด attribute ที่เป็น binary/ยาวเกิน ให้สั้นลงเพื่ออ่านง่าย
+            s = str(val)
+            attrs[name] = s if len(s) <= 200 else s[:200] + '…'
+        return True, attrs, 'ok'
+
+    except LDAPSocketOpenError as e:
+        return False, None, f'เชื่อมต่อ AD ไม่ได้ ({e})'
+    except LDAPException as e:
+        return False, None, f'AD error ({e})'
+    except Exception as e:  # noqa: BLE001
+        return False, None, f'error ({e})'
 
 
 def get_client_ip(request):

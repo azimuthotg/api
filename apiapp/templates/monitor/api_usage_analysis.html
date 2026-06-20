@@ -106,7 +106,7 @@
     </div>
 
     <!-- ภาพรวมต่อระบบ ทั้งช่วง -->
-    <h5 class="mb-2">ระบบที่เรียกเข้ามา <span class="text-muted small fw-normal">({{ filters.date_from }} ถึง {{ filters.date_to }})</span></h5>
+    <h5 class="mb-2">ระบบที่เรียกเข้ามา <span class="text-muted small fw-normal">({{ date_from|date:"d-m-Y" }} ถึง {{ date_to|date:"d-m-Y" }})</span></h5>
     <div class="card mb-4">
         <div class="table-responsive">
             <table class="table table-sm table-hover mb-0">

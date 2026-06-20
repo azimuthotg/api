@@ -462,6 +462,9 @@ def monitor_api_usage_analysis(request):
         },
         'base_query': base_query,
         'bkk_tz': BANGKOK_TZ,
+        # date object ไว้แสดงหัวตารางเป็น d-m-Y (filters.* คงเป็น ISO ไว้ใส่ <input date>/ลิงก์)
+        'date_from': date_from,
+        'date_to': date_to,
     }
     return render(request, 'monitor/api_usage_analysis.html', context)
 

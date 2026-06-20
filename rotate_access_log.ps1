@@ -39,6 +39,9 @@ if ($DryRun) { $pyArgs += '--dry-run' }
 # แล้วพ่น UnicodeEncodeError เมื่อ command พิมพ์ภาษาไทย
 $env:PYTHONIOENCODING = 'utf-8'
 $env:PYTHONUTF8 = '1'
+# ให้ PowerShell ถอดรหัส stdout ของ native exe เป็น UTF-8 ให้ตรงกับที่ python พ่น
+# (ไม่งั้นใช้ console codepage แล้วภาษาไทยใน log เพี้ยน)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # จับ stdout+stderr ทั้งคู่ลง log โดย "ไม่" ปล่อยให้ stderr ของ native exe
 # กลายเป็น terminating error (ปัญหาคลาสสิกของ PowerShell 5.1) — ตัดสินสำเร็จ/พัง

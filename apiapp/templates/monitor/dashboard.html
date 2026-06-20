@@ -18,6 +18,12 @@
     <div class="container-fluid">
         <span class="navbar-brand mb-0 h1">📋 Monitor การผูกบัญชี (LINE × LDAP)</span>
         <div class="d-flex align-items-center gap-2">
+            <div class="form-check form-check-inline text-light m-0">
+                <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                <label class="form-check-label small" for="autoRefresh">
+                    รีเฟรชอัตโนมัติ <span id="autoRefreshCountdown" class="badge text-bg-secondary">5</span>
+                </label>
+            </div>
             <a href="?" class="btn btn-sm btn-outline-light">รีเฟรช</a>
             <a href="{% url 'monitor_api_usage' %}" class="btn btn-sm btn-info">📡 การใช้งาน endpoint</a>
             <a href="{% url 'monitor_token_log' %}" class="btn btn-sm btn-info">⏱ Token ระบบ</a>
@@ -184,12 +190,58 @@
         });
     });
 
-    // auto-refresh ทุก 5 วินาที — ข้ามถ้ากำลังพิมพ์ในช่องกรอง (กันรีโหลดทับสิ่งที่พิมพ์)
-    setInterval(function () {
-        var el = document.activeElement;
-        var typing = el && ['INPUT', 'SELECT', 'TEXTAREA'].indexOf(el.tagName) !== -1;
-        if (!typing) { location.reload(); }
-    }, 5000);
+</script>
+
+<script>
+(function () {
+    var REFRESH_SECONDS = 5;
+    var STORAGE_KEY = 'monitorDashboardAutoRefresh';
+    var checkbox = document.getElementById('autoRefresh');
+    var countdownEl = document.getElementById('autoRefreshCountdown');
+    var remaining = REFRESH_SECONDS;
+    var timer = null;
+
+    // จำค่าที่ผู้ใช้เลือกไว้ (เปิด/ปิด) ข้ามการรีเฟรช
+    var saved = localStorage.getItem(STORAGE_KEY);
+    if (saved !== null) {
+        checkbox.checked = (saved === '1');
+    }
+
+    function stop() {
+        if (timer) { clearInterval(timer); timer = null; }
+    }
+
+    function start() {
+        stop();
+        remaining = REFRESH_SECONDS;
+        countdownEl.textContent = remaining;
+        timer = setInterval(function () {
+            // หยุดนับเมื่อแท็บไม่ได้อยู่หน้าจอ เพื่อไม่ให้รีเฟรชทิ้งเปล่า
+            if (document.hidden) { return; }
+            remaining -= 1;
+            if (remaining <= 0) {
+                stop();
+                location.reload();   // คงค่า query string (ตัวกรอง/หน้า) ไว้
+                return;
+            }
+            countdownEl.textContent = remaining;
+        }, 1000);
+    }
+
+    function update() {
+        localStorage.setItem(STORAGE_KEY, checkbox.checked ? '1' : '0');
+        if (checkbox.checked) {
+            countdownEl.classList.remove('d-none');
+            start();
+        } else {
+            stop();
+            countdownEl.classList.add('d-none');
+        }
+    }
+
+    checkbox.addEventListener('change', update);
+    update();
+})();
 </script>
 </body>
 </html>

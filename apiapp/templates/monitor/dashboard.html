@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% load tz %}<!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
@@ -123,7 +123,7 @@
                 <tbody>
                     {% for log in page_obj %}
                     <tr class="{% if log.status == 'fail' %}table-danger{% endif %}">
-                        <td class="text-nowrap small">{{ log.created_at|date:"d/m/y H:i:s" }}</td>
+                        <td class="text-nowrap small">{{ log.created_at|timezone:bkk_tz|date:"d-m-Y H:i:s" }}</td>
                         <td>
                             {% if log.status == 'success' %}
                                 <span class="badge text-bg-success">สำเร็จ</span>

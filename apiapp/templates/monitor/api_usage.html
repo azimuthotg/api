@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% load tz %}<!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
@@ -148,7 +148,7 @@
                 <tbody>
                     {% for log in page_obj %}
                         <tr>
-                            <td class="text-nowrap">{{ log.created_at|date:"d-m-Y H:i:s" }}</td>
+                            <td class="text-nowrap">{{ log.created_at|timezone:bkk_tz|date:"d-m-Y H:i:s" }}</td>
                             <td>{{ log.client_user|default:"-" }} <span class="badge text-bg-light">{{ log.api_version }}</span></td>
                             <td class="mono">{{ log.endpoint }}</td>
                             <td class="mono">{{ log.target_user|default:"-" }}</td>

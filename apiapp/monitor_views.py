@@ -3,7 +3,8 @@
 เข้าถึงด้วยรหัสผ่านร่วมแบบง่าย (settings.MONITOR_PASSWORD) — สำหรับบรรณารักษ์
 เคาน์เตอร์ดูกิจกรรมการผูกบัญชี สำเร็จ/ไม่สำเร็จ พร้อมสาเหตุ เพื่อนำ error ไปแจ้งทีมคอม
 """
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib import messages
@@ -18,6 +19,27 @@ from apiapp.monitoring import check_ad_detailed, get_ad_user_attributes
 from apiapp.token_utils import decode_token
 
 SESSION_KEY = 'monitor_authed'
+
+# เก็บเวลาใน DB เป็น UTC (settings.TIME_ZONE = 'UTC') แต่หน้า Monitor ต้องคิด/แสดง
+# ตาม "วันไทย" — คำนวณช่วงวันที่เป็น datetime aware แล้วใช้ filter __gte/__lt (ไม่ใช่
+# __date) เพื่อให้ query เทียบกับ UTC ที่เก็บไว้ตรงๆ ไม่ไปเรียก MySQL CONVERT_TZ
+# (ซึ่งคืน NULL เพราะ MySQL ยังไม่ได้โหลดตาราง timezone)
+BANGKOK_TZ = ZoneInfo('Asia/Bangkok')
+
+
+def _bkk_today():
+    """วันที่ 'วันนี้' ตามเวลาไทย"""
+    return timezone.now().astimezone(BANGKOK_TZ).date()
+
+
+def _bkk_day_range(date_from, date_to=None):
+    """ช่วง [start, end) เป็น datetime aware ครอบวันไทย date_from..date_to (รวมปลายทาง)
+    ใช้กับ created_at__gte=start, created_at__lt=end"""
+    if date_to is None:
+        date_to = date_from
+    start = datetime.combine(date_from, time.min, tzinfo=BANGKOK_TZ)
+    end = datetime.combine(date_to, time.min, tzinfo=BANGKOK_TZ) + timedelta(days=1)
+    return start, end
 
 # ป้ายแสดงผล reason_code เป็นภาษาคนสำหรับเจ้าหน้าที่หน้างาน
 REASON_LABELS = {
@@ -261,8 +283,9 @@ def monitor_api_usage(request):
     # หน้านี้เป็น real-time monitor: ดูเฉพาะ "วันนี้" เท่านั้น เพื่อให้ query เบาตลอด
     # แม้รีเฟรชถี่ (5-10 วิ) — ข้อมูลย้อนหลังอยู่หน้า Analysis (อ่านจากคลัง api_access_archive)
     # หลัง management command rotate_access_log เดินทุกคืน ตารางสดจะเหลือเฉพาะวันนี้อยู่แล้ว
-    today = timezone.localtime().date()
-    today_qs = ApiAccessLog.objects.filter(created_at__date=today)
+    today = _bkk_today()
+    start, end = _bkk_day_range(today)
+    today_qs = ApiAccessLog.objects.filter(created_at__gte=start, created_at__lt=end)
     qs = today_qs
 
     # ---- ตัวกรอง ----
@@ -334,6 +357,7 @@ def monitor_api_usage(request):
             'q': q,
         },
         'base_query': base_query,
+        'bkk_tz': BANGKOK_TZ,
     }
     return render(request, 'monitor/api_usage.html', context)
 
@@ -356,16 +380,15 @@ def monitor_api_usage_analysis(request):
     if not _is_authed(request):
         return redirect('monitor_login')
 
-    today = timezone.localtime().date()
+    today = _bkk_today()
     # ค่าเริ่มต้น: 7 วันก่อนหน้า (ถึงเมื่อวาน — วันนี้ยังไม่ถูกย้ายเข้าคลัง)
     date_to = _parse_iso_date(request.GET.get('date_to'), today - timedelta(days=1))
     date_from = _parse_iso_date(request.GET.get('date_from'), date_to - timedelta(days=6))
     if date_from > date_to:
         date_from, date_to = date_to, date_from
 
-    qs = ApiAccessArchive.objects.filter(
-        created_at__date__gte=date_from, created_at__date__lte=date_to,
-    )
+    start, end = _bkk_day_range(date_from, date_to)
+    qs = ApiAccessArchive.objects.filter(created_at__gte=start, created_at__lt=end)
 
     # ---- ตัวกรอง (ชุดเดียวกับหน้า real-time) ----
     client_filter = request.GET.get('client_user', '').strip()
@@ -438,6 +461,7 @@ def monitor_api_usage_analysis(request):
             'q': q,
         },
         'base_query': base_query,
+        'bkk_tz': BANGKOK_TZ,
     }
     return render(request, 'monitor/api_usage_analysis.html', context)
 
@@ -508,5 +532,6 @@ def monitor_dashboard(request):
         'reason_choices': REASON_LABELS,
         'event_choices': EVENT_LABELS,
         'base_query': base_query,
+        'bkk_tz': BANGKOK_TZ,
     }
     return render(request, 'monitor/dashboard.html', context)

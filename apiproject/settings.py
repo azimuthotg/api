@@ -139,7 +139,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'Asia/Bangkok'
+TIME_ZONE = 'UTC'  # เก็บ UTC เพื่อเลี่ยง MySQL CONVERT_TZ (ตาราง tz ยังไม่โหลด)
+                   # การแสดงเวลาไทยทำที่ชั้นแอป/เทมเพลตของหน้า Monitor แทน (ดู monitor_views)
 
 USE_I18N = True
 

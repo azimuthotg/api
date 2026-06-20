@@ -7,36 +7,49 @@
 # รันเอง (ทดสอบ):
 #   powershell -ExecutionPolicy Bypass -File .\rotate_access_log.ps1
 #   powershell -ExecutionPolicy Bypass -File .\rotate_access_log.ps1 -DryRun
+#
+# ดู log (อ่านเป็น UTF-8 เพื่อให้ภาษาไทยไม่เพี้ยน):
+#   Get-Content .\logs\rotate_access_log.log -Encoding UTF8 -Tail 30
 
 param(
     [switch]$DryRun
 )
 
-$ErrorActionPreference = 'Stop'
-
-# โฟลเดอร์โปรเจกต์ = ที่อยู่ของสคริปต์นี้
+# โฟลเดอร์โปรเจกต์ = ที่อยู่ของสคริปต์นี้ / Python ของระบบ (เดียวกับ deploy.ps1)
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-# Python ของระบบ (เดียวกับที่ wfastcgi/IIS ใช้ ดู deploy.ps1 / CLAUDE.md)
 $Python = 'C:\Python312\python.exe'
 
 $logDir = Join-Path $ProjectDir 'logs'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 $logFile = Join-Path $logDir 'rotate_access_log.log'
 
-$stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-Add-Content -Path $logFile -Value "[$stamp] เริ่ม rotate_access_log (DryRun=$DryRun)"
+function Write-Log($msg) {
+    $stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Add-Content -Path $logFile -Value "[$stamp] $msg" -Encoding UTF8
+}
+
+Write-Log "start rotate_access_log (DryRun=$DryRun)"
 
 Set-Location $ProjectDir
-$args = @('manage.py', 'rotate_access_log')
-if ($DryRun) { $args += '--dry-run' }
+$pyArgs = @('manage.py', 'rotate_access_log')
+if ($DryRun) { $pyArgs += '--dry-run' }
 
-$output = & $Python @args 2>&1
-$output | ForEach-Object { Add-Content -Path $logFile -Value "    $_" }
+# จับ stdout+stderr ทั้งคู่ลง log โดย "ไม่" ปล่อยให้ stderr ของ native exe
+# กลายเป็น terminating error (ปัญหาคลาสสิกของ PowerShell 5.1) — ตัดสินสำเร็จ/พัง
+# จาก exit code จริง ($LASTEXITCODE) แทน
+$prev = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$output = & $Python @pyArgs 2>&1
+$code = $LASTEXITCODE
+$ErrorActionPreference = $prev
 
-$stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-if ($LASTEXITCODE -eq 0) {
-    Add-Content -Path $logFile -Value "[$stamp] เสร็จเรียบร้อย (exit 0)"
+foreach ($line in $output) {
+    Add-Content -Path $logFile -Value "    $line" -Encoding UTF8
+}
+
+if ($code -eq 0) {
+    Write-Log "done (exit 0)"
 } else {
-    Add-Content -Path $logFile -Value "[$stamp] ล้มเหลว (exit $LASTEXITCODE)"
-    exit $LASTEXITCODE
+    Write-Log "FAILED (exit $code)"
+    exit $code
 }

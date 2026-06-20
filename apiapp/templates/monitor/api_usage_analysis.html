@@ -129,7 +129,7 @@
                             <td class="text-end {% if s.fails %}text-danger fw-bold{% endif %}">{{ s.fails }}</td>
                             <td class="text-end">{% if s.total %}{% widthratio s.fails s.total 100 %}%{% else %}-{% endif %}</td>
                             <td class="text-end">{{ s.ips }}</td>
-                            <td class="mono small text-nowrap">{{ s.last_seen|date:"Y-m-d H:i" }}</td>
+                            <td class="mono small text-nowrap">{{ s.last_seen|date:"d-m-Y H:i" }}</td>
                             <td class="text-end">
                                 {% if s.client_user %}<a class="btn btn-sm btn-outline-secondary py-0" href="?date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&client_user={{ s.client_user|urlencode }}">ดูเฉพาะระบบนี้</a>{% endif %}
                             </td>
@@ -163,7 +163,7 @@
                 <tbody>
                     {% for log in page_obj %}
                         <tr>
-                            <td class="text-nowrap">{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+                            <td class="text-nowrap">{{ log.created_at|date:"d-m-Y H:i:s" }}</td>
                             <td>{{ log.client_user|default:"-" }} <span class="badge text-bg-light">{{ log.api_version }}</span></td>
                             <td class="mono">{{ log.endpoint }}</td>
                             <td class="mono">{{ log.target_user|default:"-" }}</td>

@@ -34,6 +34,12 @@ Set-Location $ProjectDir
 $pyArgs = @('manage.py', 'rotate_access_log')
 if ($DryRun) { $pyArgs += '--dry-run' }
 
+# บังคับ python ใช้ UTF-8 กับ stdout/stderr — จำเป็นเมื่อรันแบบ redirect/headless
+# (เช่นตอน Task Scheduler รัน หรือตอน capture ใน .ps1) ไม่งั้น default เป็น cp1252
+# แล้วพ่น UnicodeEncodeError เมื่อ command พิมพ์ภาษาไทย
+$env:PYTHONIOENCODING = 'utf-8'
+$env:PYTHONUTF8 = '1'
+
 # จับ stdout+stderr ทั้งคู่ลง log โดย "ไม่" ปล่อยให้ stderr ของ native exe
 # กลายเป็น terminating error (ปัญหาคลาสสิกของ PowerShell 5.1) — ตัดสินสำเร็จ/พัง
 # จาก exit code จริง ($LASTEXITCODE) แทน

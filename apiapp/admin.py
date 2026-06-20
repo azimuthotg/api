@@ -1,6 +1,6 @@
 from django.contrib import admin
 # from app import models
-from apiapp.models import UserProfile,StudentsInfo,BindingLog,TokenIssueLog,ApiAccessLog
+from apiapp.models import UserProfile,StudentsInfo,BindingLog,TokenIssueLog,ApiAccessLog,ApiAccessArchive
 
 # Register your models here.
 admin.site.register(UserProfile)
@@ -23,6 +23,15 @@ class ApiAccessLogAdmin(admin.ModelAdmin):
     search_fields = ('client_user', 'target_user', 'client_ip', 'endpoint', 'message')
     date_hierarchy = 'created_at'
     readonly_fields = [f.name for f in ApiAccessLog._meta.fields]
+
+
+@admin.register(ApiAccessArchive)
+class ApiAccessArchiveAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'client_user', 'endpoint', 'target_user', 'result', 'http_status', 'reason_code', 'api_version', 'client_ip')
+    list_filter = ('result', 'api_version', 'endpoint')
+    search_fields = ('client_user', 'target_user', 'client_ip', 'endpoint', 'message')
+    date_hierarchy = 'created_at'
+    readonly_fields = [f.name for f in ApiAccessArchive._meta.fields]
 
 
 @admin.register(BindingLog)

@@ -3,17 +3,17 @@
 เข้าถึงด้วยรหัสผ่านร่วมแบบง่าย (settings.MONITOR_PASSWORD) — สำหรับบรรณารักษ์
 เคาน์เตอร์ดูกิจกรรมการผูกบัญชี สำเร็จ/ไม่สำเร็จ พร้อมสาเหตุ เพื่อนำ error ไปแจ้งทีมคอม
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from apiapp.models import BindingLog, TokenIssueLog, ApiAccessLog
+from apiapp.models import BindingLog, TokenIssueLog, ApiAccessLog, ApiAccessArchive
 from apiapp.monitoring import check_ad_detailed, get_ad_user_attributes
 from apiapp.token_utils import decode_token
 
@@ -258,7 +258,12 @@ def monitor_api_usage(request):
     if not _is_authed(request):
         return redirect('monitor_login')
 
-    qs = ApiAccessLog.objects.all()
+    # หน้านี้เป็น real-time monitor: ดูเฉพาะ "วันนี้" เท่านั้น เพื่อให้ query เบาตลอด
+    # แม้รีเฟรชถี่ (5-10 วิ) — ข้อมูลย้อนหลังอยู่หน้า Analysis (อ่านจากคลัง api_access_archive)
+    # หลัง management command rotate_access_log เดินทุกคืน ตารางสดจะเหลือเฉพาะวันนี้อยู่แล้ว
+    today = timezone.localtime().date()
+    today_qs = ApiAccessLog.objects.filter(created_at__date=today)
+    qs = today_qs
 
     # ---- ตัวกรอง ----
     client_filter = request.GET.get('client_user', '').strip()
@@ -280,20 +285,19 @@ def monitor_api_usage(request):
             | Q(endpoint__icontains=q)
         )
 
-    # ---- สรุปวันนี้ ----
-    today = timezone.localtime().date()
-    today_qs = ApiAccessLog.objects.filter(created_at__date=today)
+    # ---- สรุปวันนี้ (ทุกตัวอ่านจากตารางสด = วันนี้เท่านั้น จึงเบา) ----
+    today_total = today_qs.count()
+    today_fail = today_qs.filter(result=ApiAccessLog.RESULT_FAIL).count()
     summary = {
-        'today_total': today_qs.count(),
-        'today_fail': today_qs.filter(result=ApiAccessLog.RESULT_FAIL).count(),
+        'today_total': today_total,
+        'today_fail': today_fail,
+        'today_success': today_total - today_fail,
         'today_systems': today_qs.exclude(client_user__isnull=True).values('client_user').distinct().count(),
-        'all_total': ApiAccessLog.objects.count(),
     }
 
-    # ---- ภาพรวมต่อระบบ (7 วันล่าสุด) ----
-    since = timezone.now() - timedelta(days=7)
+    # ---- ภาพรวมต่อระบบ (วันนี้) ----
     systems = list(
-        ApiAccessLog.objects.filter(created_at__gte=since)
+        today_qs
         .values('client_user')
         .annotate(
             total=Count('id'),
@@ -302,9 +306,9 @@ def monitor_api_usage(request):
         .order_by('-total')[:20]
     )
 
-    # ตัวเลือก client สำหรับ dropdown
+    # ตัวเลือก client สำหรับ dropdown (เฉพาะระบบที่เรียกวันนี้)
     client_choices = list(
-        ApiAccessLog.objects.exclude(client_user__isnull=True).exclude(client_user='')
+        today_qs.exclude(client_user__isnull=True).exclude(client_user='')
         .values_list('client_user', flat=True).distinct().order_by('client_user')
     )
 
@@ -332,6 +336,110 @@ def monitor_api_usage(request):
         'base_query': base_query,
     }
     return render(request, 'monitor/api_usage.html', context)
+
+
+def _parse_iso_date(value, default):
+    """แปลง 'YYYY-MM-DD' จาก query เป็น date, ไม่ผ่านก็คืนค่า default"""
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        return default
+
+
+def monitor_api_usage_analysis(request):
+    """หน้าวิเคราะห์ย้อนหลัง — อ่านจากคลัง ApiAccessArchive (ไม่ใช่ตารางสด)
+
+    แยกจากหน้า real-time โดยตั้งใจ: หน้านี้ไว้ "วิเคราะห์/ตรวจสอบระบบที่เข้ามา" เลือก
+    ช่วงวันที่เองได้ ไม่มี auto-refresh จึง query หนักได้โดยไม่กระทบหน้า monitor ที่รีเฟรชถี่
+    (คนละตาราง) ข้อมูล "วันนี้" ยังอยู่ในตารางสด → ดูที่หน้า real-time. คลังมีเฉพาะวันที่ปิดแล้ว
+    """
+    if not _is_authed(request):
+        return redirect('monitor_login')
+
+    today = timezone.localtime().date()
+    # ค่าเริ่มต้น: 7 วันก่อนหน้า (ถึงเมื่อวาน — วันนี้ยังไม่ถูกย้ายเข้าคลัง)
+    date_to = _parse_iso_date(request.GET.get('date_to'), today - timedelta(days=1))
+    date_from = _parse_iso_date(request.GET.get('date_from'), date_to - timedelta(days=6))
+    if date_from > date_to:
+        date_from, date_to = date_to, date_from
+
+    qs = ApiAccessArchive.objects.filter(
+        created_at__date__gte=date_from, created_at__date__lte=date_to,
+    )
+
+    # ---- ตัวกรอง (ชุดเดียวกับหน้า real-time) ----
+    client_filter = request.GET.get('client_user', '').strip()
+    result_filter = request.GET.get('result', '')
+    version_filter = request.GET.get('api_version', '')
+    q = request.GET.get('q', '').strip()
+
+    if client_filter:
+        qs = qs.filter(client_user=client_filter)
+    if result_filter in (ApiAccessArchive.RESULT_SUCCESS, ApiAccessArchive.RESULT_FAIL):
+        qs = qs.filter(result=result_filter)
+    if version_filter:
+        qs = qs.filter(api_version=version_filter)
+    if q:
+        qs = qs.filter(
+            Q(target_user__icontains=q)
+            | Q(client_user__icontains=q)
+            | Q(client_ip__icontains=q)
+            | Q(endpoint__icontains=q)
+        )
+
+    # ---- สรุปทั้งช่วง ----
+    range_total = qs.count()
+    range_fail = qs.filter(result=ApiAccessArchive.RESULT_FAIL).count()
+    summary = {
+        'range_total': range_total,
+        'range_fail': range_fail,
+        'range_success': range_total - range_fail,
+        'range_systems': qs.exclude(client_user__isnull=True).values('client_user').distinct().count(),
+    }
+
+    # ---- ภาพรวมต่อระบบ ทั้งช่วง (ไว้ดูว่าระบบไหนเรียกเยอะ/ล้มเหลวเยอะ/ใช้ IP กี่ตัว) ----
+    systems = list(
+        qs.values('client_user')
+        .annotate(
+            total=Count('id'),
+            fails=Count('id', filter=Q(result=ApiAccessArchive.RESULT_FAIL)),
+            ips=Count('client_ip', distinct=True),
+            last_seen=Max('created_at'),
+        )
+        .order_by('-total')[:50]
+    )
+
+    client_choices = list(
+        qs.exclude(client_user__isnull=True).exclude(client_user='')
+        .values_list('client_user', flat=True).distinct().order_by('client_user')
+    )
+
+    paginator = Paginator(qs, 100)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    for log in page_obj:
+        log.reason_label = _access_explain(log)
+
+    params = request.GET.copy()
+    params.pop('page', None)
+    base_query = params.urlencode()
+
+    context = {
+        'page_obj': page_obj,
+        'summary': summary,
+        'systems': systems,
+        'client_choices': client_choices,
+        'filters': {
+            'date_from': date_from.isoformat(),
+            'date_to': date_to.isoformat(),
+            'client_user': client_filter,
+            'result': result_filter,
+            'api_version': version_filter,
+            'q': q,
+        },
+        'base_query': base_query,
+    }
+    return render(request, 'monitor/api_usage_analysis.html', context)
 
 
 def monitor_dashboard(request):

@@ -117,6 +117,42 @@ class ApiAccessLog(models.Model):
         return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.client_user or self.client_ip} -> {self.endpoint} ({self.http_status})"
 
 
+class ApiAccessArchive(models.Model):
+    """คลังเก็บ API access log ย้อนหลัง (พ้นวันนี้) ไว้วิเคราะห์/ตรวจสอบระบบที่เข้ามา
+
+    ตารางสด ApiAccessLog เก็บเฉพาะ "วันนี้" เพื่อให้หน้า Monitor real-time เบาตลอด
+    ทุกเที่ยงคืน management command `rotate_access_log` ย้ายแถวของเมื่อวานมาที่นี่
+    แล้วลบออกจากตารางสด — คงค่า created_at เดิมไว้ จึง "ไม่" ใช้ auto_now_add
+    เก็บที่นี่ 90 วันเพื่อการวิเคราะห์ หน้า real-time ไม่แตะตารางนี้เลย โครงสร้างเหมือน
+    ApiAccessLog ทุกคอลัมน์ (ดิบครบ) เพื่อให้ย้อนดูรายละเอียดได้เหมือนกัน
+    """
+    RESULT_SUCCESS = 'success'
+    RESULT_FAIL = 'fail'
+
+    created_at = models.DateTimeField(db_index=True)  # คงเวลาจริงจากตารางสด (ไม่ auto_now_add)
+    client_user = models.CharField(max_length=150, blank=True, null=True, db_index=True)
+    client_ip = models.CharField(max_length=45, blank=True, null=True)
+    user_agent = models.CharField(max_length=300, blank=True, null=True)
+    api_version = models.CharField(max_length=5, blank=True, null=True)
+    endpoint = models.CharField(max_length=100, db_index=True)
+    method = models.CharField(max_length=8, blank=True, null=True)
+    target_user = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    http_status = models.IntegerField(blank=True, null=True, db_index=True)
+    result = models.CharField(max_length=10, blank=True, null=True, db_index=True)
+    reason_code = models.CharField(max_length=50, blank=True, null=True)
+    message = models.TextField(blank=True, null=True)
+    duration_ms = models.IntegerField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'api_access_archive'
+        ordering = ['-created_at']
+        verbose_name = 'API Access Archive'
+        verbose_name_plural = 'API Access Archives'
+
+    def __str__(self):
+        return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.client_user or self.client_ip} -> {self.endpoint} ({self.http_status})"
+
+
 class StudentsInfo(models.Model):
     student_code = models.CharField(max_length=50, blank=True, null=False,primary_key=True)  # กำหนดให้ student_code เป็น primary key
     prefix_name = models.CharField(max_length=50, blank=True, null=True)

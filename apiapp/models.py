@@ -153,6 +153,56 @@ class ApiAccessArchive(models.Model):
         return f"[{self.created_at:%Y-%m-%d %H:%M}] {self.client_user or self.client_ip} -> {self.endpoint} ({self.http_status})"
 
 
+class ExternalMember(models.Model):
+    """บุคคลภายนอกที่ลงทะเบียนขอเข้าใช้ห้องสมุด — ประชากร "ขาที่ 3"
+
+    ไม่มีใน AD (และเราแตะ AD ไม่ได้) ไม่มีใน StudentsInfo/StaffInfo → เก็บตัวตนเองในตารางนี้
+    (Django-managed เขียนได้). กุญแจ = เลขบัตร ปชช. 13 หลัก (ตรวจ checksum ตอนลงทะเบียน).
+    ลงทะเบียนเอง อนุมัติทันที. การ "เข้าใช้งาน" ใช้รหัส 10 หลักใน ExternalAccessCode (pool รายวัน).
+    """
+    STATUS_ACTIVE = 'active'
+    STATUS_REVOKED = 'revoked'
+    STATUS_CHOICES = [(STATUS_ACTIVE, 'active'), (STATUS_REVOKED, 'revoked')]
+
+    citizen_id = models.CharField(max_length=13, primary_key=True)  # เลขบัตร ปชช. (ผ่าน checksum)
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+    registered_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'external_member'
+        ordering = ['-registered_at']
+        verbose_name = 'External Member'
+        verbose_name_plural = 'External Members'
+
+    def __str__(self):
+        return f"{self.citizen_id} {self.first_name} {self.last_name} ({self.status})"
+
+
+class ExternalAccessCode(models.Model):
+    """Pool รหัส 10 หลักสำหรับเปิดประตู (หมุนเวียนรายวัน)
+
+    รหัสถูก seed ไว้ล่วงหน้า (command seed_access_codes) เป็นเลขสุ่ม 10 หลัก (ไม่เรียงลำดับ
+    เดายาก). เมื่อบุคคลภายนอกขอเข้า ระบบจองรหัสที่ "ว่างวันนี้" ตัวที่ถูกใช้นานสุดก่อน (หมุนวน)
+    ผูกกับ assigned_citizen_id + assigned_date = วันนี้ (เวลาไทย). ประตูส่งรหัส 10 หลักมาเช็ค:
+    ถ้า assigned_date == วันนี้ = ผ่าน. รหัสใช้ได้วันเดียว ของเมื่อวานจึงใช้ไม่ได้.
+    """
+    code = models.CharField(max_length=10, unique=True)  # รหัสที่ฝังใน QR (ประตูอ่าน) เลขสุ่ม 10 หลัก
+    seq = models.IntegerField(unique=True)               # ลำดับใน pool (1..N)
+    assigned_citizen_id = models.CharField(max_length=13, blank=True, null=True, db_index=True)
+    assigned_date = models.DateField(blank=True, null=True, db_index=True)  # วันไทยที่รหัสนี้ใช้ได้
+
+    class Meta:
+        db_table = 'external_access_code'
+        ordering = ['seq']
+        verbose_name = 'External Access Code'
+        verbose_name_plural = 'External Access Codes'
+
+    def __str__(self):
+        return f"#{self.seq} {self.code} -> {self.assigned_citizen_id or '-'} ({self.assigned_date or '-'})"
+
+
 class StudentsInfo(models.Model):
     student_code = models.CharField(max_length=50, blank=True, null=False,primary_key=True)  # กำหนดให้ student_code เป็น primary key
     prefix_name = models.CharField(max_length=50, blank=True, null=True)

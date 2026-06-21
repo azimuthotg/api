@@ -47,6 +47,7 @@ router_v2.register('auth', views_v2.AuthViewSetV2, basename='auth-v2')  # เพ
 router_v2.register('ldap', views_v2.LDAPAuthViewSetV2, basename='auth-ldap-v2') # เปลี่ยนจาก 'auth-ldap' เป็น 'ldap'
 router_v2.register('personnel', views_v2.StaffInfoViewSetV2, basename='staff-info-v2')# เปลี่ยนจาก 'staff-info' เป็น 'personnel'
 router_v2.register('library', views_v2.WalaiCheckUserViewSetV2, basename='walai-v2')# เปลี่ยนจาก 'walai' เป็น 'library'
+router_v2.register('external', views_v2.ExternalAccessViewSetV2, basename='external-v2')  # บุคคลภายนอกเข้าห้องสมุด (QR/pool)
 router_v2.register('mt', views_v2.MikroTikHotspotViewSetV2, basename='mikrotik_hotspot-v2')
 router_v2.register('iot', views_v2.SonoffControlViewSetV2, basename='sonoff_control-v2')# เปลี่ยนจาก 'sonoff' เป็น 'iot'
 

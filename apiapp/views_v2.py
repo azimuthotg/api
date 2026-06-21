@@ -1,6 +1,6 @@
 # apiapp/views_v2.py
 from librouteros import connect
-from apiapp.models import UserProfile, StudentsInfo, StaffInfo
+from apiapp.models import UserProfile, StudentsInfo, StaffInfo, ExternalMember, ExternalAccessCode
 from apiapp.serializers_v2 import UserProfileSerializerV2, StudentsInfoSerializerV2, StaffInfoSerializerV2
 from rest_framework import viewsets, status
 from rest_framework.response import Response
@@ -19,6 +19,17 @@ from rest_framework.permissions import AllowAny
 from apiapp.authentication import JWTV2Authentication, PublicEndpointAuthentication
 from apiapp.monitoring import check_ad_detailed, log_binding, BindLoggingCreateMixin
 from apiapp.access_log import ApiAccessLogMixin
+from apiapp.thai_id import is_valid_thai_citizen_id
+from django.db import transaction
+from django.db.models import F
+from zoneinfo import ZoneInfo
+
+# เส้นแบ่ง "วัน" ของรหัสเข้าประตู ใช้เวลาไทย (DB เก็บ UTC — ดู monitor-timezone-mysql)
+BANGKOK_TZ = ZoneInfo('Asia/Bangkok')
+
+
+def _bkk_today():
+    return timezone.now().astimezone(BANGKOK_TZ).date()
 
 class UserViewSetV2(BindLoggingCreateMixin, JWTV2Authentication, viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
@@ -311,6 +322,96 @@ class WalaiCheckUserViewSetV2(JWTV2Authentication, viewsets.ViewSet):
         except requests.RequestException as e:
             # กรณีที่มีข้อผิดพลาดในการเชื่อมต่อกับ API
             return Response({"error": f"Error fetching data from API: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#----------------------------------------------
+class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ViewSet):
+    """บุคคลภายนอกเข้าห้องสมุด: ออกรหัส (issue) + เช็คที่ประตู (check_external)
+
+    ประชากร "ขาที่ 3" ที่ไม่มีใน AD และเราแตะ AD ไม่ได้ → ตัวตนอยู่ใน ExternalMember (เขียนได้)
+    เข้าใช้งานผ่านรหัส 10 หลักใน ExternalAccessCode (pool หมุนเวียนรายวัน) ดู [[external-library-member]]
+    หน้าเว็บออก QR อยู่ระบบ reserv — ที่นี่เป็น backend อย่างเดียว
+    ติด ApiAccessLogMixin ให้ check ที่ประตูโผล่ใน /monitor/api-usage/ เหมือน check นศ./บุคลากร
+    """
+    access_log_api_version = 'v2'
+
+    @action(detail=False, methods=['post'])
+    def issue(self, request):
+        """รับเลขบัตร 13 หลัก + ชื่อ-สกุล → ตรวจ checksum → สมัคร (อนุมัติทันที) → จองรหัสวันนี้"""
+        citizen_id = (request.data.get('citizen_id') or '').strip()
+        first_name = (request.data.get('first_name') or '').strip()
+        last_name = (request.data.get('last_name') or '').strip()
+
+        if not is_valid_thai_citizen_id(citizen_id):
+            request._api_access_reason = ('invalid_citizen_id', 'เลขบัตรประชาชนไม่ถูกต้อง')
+            return Response({'success': False, 'detail': 'Invalid citizen id'}, status=status.HTTP_400_BAD_REQUEST)
+        if not first_name or not last_name:
+            return Response({'success': False, 'detail': 'Missing first_name or last_name'}, status=status.HTTP_400_BAD_REQUEST)
+
+        today = _bkk_today()
+        with transaction.atomic():
+            member, _created = ExternalMember.objects.get_or_create(
+                citizen_id=citizen_id,
+                defaults={'first_name': first_name, 'last_name': last_name},
+            )
+            if member.status == ExternalMember.STATUS_REVOKED:
+                request._api_access_reason = ('revoked', 'สมาชิกถูกระงับ')
+                return Response({'success': False, 'detail': 'Member revoked'}, status=status.HTTP_403_FORBIDDEN)
+
+            # ออกบัตรซ้ำคนเดิมในวันเดียว = คืนรหัสเดิม (ไม่เปลือง slot)
+            assigned = ExternalAccessCode.objects.filter(
+                assigned_citizen_id=citizen_id, assigned_date=today
+            ).first()
+            if assigned is None:
+                # จองรหัสที่ว่างวันนี้ ตัวที่ถูกใช้นานสุดก่อน (หมุนวน) — ล็อกแถวกัน race
+                assigned = (
+                    ExternalAccessCode.objects
+                    .exclude(assigned_date=today)
+                    .order_by(F('assigned_date').asc(nulls_first=True), 'seq')
+                    .select_for_update()
+                    .first()
+                )
+                if assigned is None:
+                    request._api_access_reason = ('pool_full', 'รหัสในพูลถูกใช้หมดสำหรับวันนี้')
+                    return Response({'success': False, 'detail': 'Access code pool exhausted for today'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                assigned.assigned_citizen_id = citizen_id
+                assigned.assigned_date = today
+                assigned.save(update_fields=['assigned_citizen_id', 'assigned_date'])
+
+        return Response({
+            'success': True,
+            'access_code': assigned.code,       # นำไปสร้าง QR (ฝั่ง reserv)
+            'valid_date': today.isoformat(),    # ใช้ได้เฉพาะวันนี้ (เวลาไทย)
+            'member': {
+                'citizen_id': member.citizen_id,
+                'first_name': member.first_name,
+                'last_name': member.last_name,
+            },
+            'api_version': 'v2',
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get', 'post'], url_path='check/(?P<code>[^/.]+)')
+    def check_external(self, request, code=None):
+        """ประตูส่งรหัส 10 หลักมา → allow ถ้ารหัสนี้ถูกจองไว้สำหรับวันนี้และสมาชิกไม่ถูกระงับ"""
+        today = _bkk_today()
+        entry = ExternalAccessCode.objects.filter(code=code, assigned_date=today).first()
+        if entry is None:
+            request._api_access_reason = ('not_valid_today', 'รหัสนี้ไม่ได้ใช้งานวันนี้')
+            return Response({'allow': False, 'detail': 'Code not valid today'}, status=status.HTTP_404_NOT_FOUND)
+
+        member = ExternalMember.objects.filter(citizen_id=entry.assigned_citizen_id).first()
+        if member is None or member.status == ExternalMember.STATUS_REVOKED:
+            request._api_access_reason = ('revoked', 'สมาชิกถูกระงับ/ไม่พบ')
+            return Response({'allow': False, 'detail': 'Member revoked or not found'}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response({
+            'allow': True,
+            'member': {
+                'citizen_id': member.citizen_id,
+                'first_name': member.first_name,
+                'last_name': member.last_name,
+            },
+            'api_version': 'v2',
+        }, status=status.HTTP_200_OK)
 
 #----------------------------------------------
 class MikroTikHotspotViewSetV2(JWTV2Authentication, viewsets.ViewSet):

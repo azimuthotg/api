@@ -1,6 +1,6 @@
 from django.contrib import admin
 # from app import models
-from apiapp.models import UserProfile,StudentsInfo,BindingLog,TokenIssueLog,ApiAccessLog,ApiAccessArchive
+from apiapp.models import UserProfile,StudentsInfo,BindingLog,TokenIssueLog,ApiAccessLog,ApiAccessArchive,ExternalMember,ExternalAccessCode
 
 # Register your models here.
 admin.site.register(UserProfile)
@@ -32,6 +32,22 @@ class ApiAccessArchiveAdmin(admin.ModelAdmin):
     search_fields = ('client_user', 'target_user', 'client_ip', 'endpoint', 'message')
     date_hierarchy = 'created_at'
     readonly_fields = [f.name for f in ApiAccessArchive._meta.fields]
+
+
+@admin.register(ExternalMember)
+class ExternalMemberAdmin(admin.ModelAdmin):
+    list_display = ('citizen_id', 'first_name', 'last_name', 'status', 'registered_at')
+    list_filter = ('status',)
+    search_fields = ('citizen_id', 'first_name', 'last_name')
+    date_hierarchy = 'registered_at'
+
+
+@admin.register(ExternalAccessCode)
+class ExternalAccessCodeAdmin(admin.ModelAdmin):
+    list_display = ('seq', 'code', 'assigned_citizen_id', 'assigned_date')
+    list_filter = ('assigned_date',)
+    search_fields = ('code', 'assigned_citizen_id')
+    ordering = ('seq',)
 
 
 @admin.register(BindingLog)

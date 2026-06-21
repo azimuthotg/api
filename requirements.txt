@@ -13,6 +13,9 @@ whitenoise==6.12.0
 # Database (MySQL)
 mysqlclient==2.2.4
 
+# Image handling (ExternalMember.photo — บัตรสมาชิกภายนอกถาวร)
+Pillow==10.3.0
+
 # External integrations
 ldap3==2.9.1            # Active Directory auth (NPU.local)
 librouteros==3.2.1      # MikroTik RouterOS API

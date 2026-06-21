@@ -1,11 +1,15 @@
 # apiapp/views_v2.py
 from librouteros import connect
 from apiapp.models import UserProfile, StudentsInfo, StaffInfo, ExternalMember, ExternalAccessCode
-from apiapp.serializers_v2 import UserProfileSerializerV2, StudentsInfoSerializerV2, StaffInfoSerializerV2
+from apiapp.serializers_v2 import UserProfileSerializerV2, StudentsInfoSerializerV2, StaffInfoSerializerV2, ExternalMemberSerializerV2
 from rest_framework import viewsets, status
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from ldap3 import Server, Connection, ALL, NTLM
 from rest_framework.decorators import action
+from django.http import FileResponse
+import mimetypes
+import random
 import requests
 import time
 from django.conf import settings
@@ -30,6 +34,18 @@ BANGKOK_TZ = ZoneInfo('Asia/Bangkok')
 
 def _bkk_today():
     return timezone.now().astimezone(BANGKOK_TZ).date()
+
+
+def _gen_permanent_code():
+    """สุ่มรหัสถาวร 10 หลัก (หลักแรก 1-9) ไม่ชนกับ pool รายวัน (ExternalAccessCode)
+    และไม่ชนกับ permanent_code ของสมาชิกถาวรคนอื่น — คืน str หรือ None เมื่อหาไม่ได้
+    """
+    for _ in range(10000):
+        code = str(random.randint(1_000_000_000, 9_999_999_999))
+        if (not ExternalAccessCode.objects.filter(code=code).exists()
+                and not ExternalMember.objects.filter(permanent_code=code).exists()):
+            return code
+    return None
 
 class UserViewSetV2(BindLoggingCreateMixin, JWTV2Authentication, viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
@@ -391,27 +407,150 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
 
     @action(detail=False, methods=['get', 'post'], url_path='check/(?P<code>[^/.]+)')
     def check_external(self, request, code=None):
-        """ประตูส่งรหัส 10 หลักมา → allow ถ้ารหัสนี้ถูกจองไว้สำหรับวันนี้และสมาชิกไม่ถูกระงับ"""
+        """ประตูส่งรหัส 10 หลักมา → allow ถ้า (ก) เป็นรหัส pool ที่จองไว้วันนี้ หรือ
+        (ข) เป็น permanent_code ของสมาชิกถาวรที่ active — ทั้งสองกรณีสมาชิกต้องไม่ถูกระงับ
+        ฝั่งประตูเรียก endpoint เดิมตัวเดียว ไม่ต้องแยก logic รายวัน/ถาวร
+        """
         today = _bkk_today()
+
+        # (ก) รหัส pool รายวัน
         entry = ExternalAccessCode.objects.filter(code=code, assigned_date=today).first()
-        if entry is None:
-            request._api_access_reason = ('not_valid_today', 'รหัสนี้ไม่ได้ใช้งานวันนี้')
-            return Response({'allow': False, 'detail': 'Code not valid today'}, status=status.HTTP_404_NOT_FOUND)
+        if entry is not None:
+            member = ExternalMember.objects.filter(citizen_id=entry.assigned_citizen_id).first()
+            if member is None or member.status == ExternalMember.STATUS_REVOKED:
+                request._api_access_reason = ('revoked', 'สมาชิกถูกระงับ/ไม่พบ')
+                return Response({'allow': False, 'detail': 'Member revoked or not found'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({
+                'allow': True,
+                'member': {
+                    'citizen_id': member.citizen_id,
+                    'first_name': member.first_name,
+                    'last_name': member.last_name,
+                },
+                'api_version': 'v2',
+            }, status=status.HTTP_200_OK)
 
-        member = ExternalMember.objects.filter(citizen_id=entry.assigned_citizen_id).first()
-        if member is None or member.status == ExternalMember.STATUS_REVOKED:
-            request._api_access_reason = ('revoked', 'สมาชิกถูกระงับ/ไม่พบ')
-            return Response({'allow': False, 'detail': 'Member revoked or not found'}, status=status.HTTP_403_FORBIDDEN)
+        # (ข) รหัสถาวร — ใช้ได้ทุกวันถ้าสมาชิก active
+        pmember = ExternalMember.objects.filter(
+            permanent_code=code, member_type=ExternalMember.TYPE_PERMANENT
+        ).first()
+        if pmember is not None:
+            if pmember.status != ExternalMember.STATUS_ACTIVE:
+                request._api_access_reason = ('revoked', 'สมาชิกถาวรถูกระงับ/ยังไม่อนุมัติ')
+                return Response({'allow': False, 'detail': 'Permanent member not active'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({
+                'allow': True,
+                'member': {
+                    'citizen_id': pmember.citizen_id,
+                    'first_name': pmember.first_name,
+                    'last_name': pmember.last_name,
+                },
+                'member_type': 'permanent',
+                'api_version': 'v2',
+            }, status=status.HTTP_200_OK)
 
-        return Response({
-            'allow': True,
-            'member': {
-                'citizen_id': member.citizen_id,
-                'first_name': member.first_name,
-                'last_name': member.last_name,
-            },
-            'api_version': 'v2',
-        }, status=status.HTTP_200_OK)
+        request._api_access_reason = ('not_valid_today', 'รหัสนี้ไม่ได้ใช้งานวันนี้')
+        return Response({'allow': False, 'detail': 'Code not valid today'}, status=status.HTTP_404_NOT_FOUND)
+
+    # ── สมาชิกถาวร (reserv /manage/ เรียก ผ่าน JWT) ────────────────────────────
+    @action(detail=False, methods=['post'], url_path='permanent/register',
+            parser_classes=[MultiPartParser, FormParser])
+    def permanent_register(self, request):
+        """ลงทะเบียนสมาชิกถาวร: citizen_id + ชื่อ-สกุล + photo → สร้าง pending รออนุมัติ"""
+        citizen_id = (request.data.get('citizen_id') or '').strip()
+        first_name = (request.data.get('first_name') or '').strip()
+        last_name = (request.data.get('last_name') or '').strip()
+        photo = request.FILES.get('photo')
+
+        if not is_valid_thai_citizen_id(citizen_id):
+            request._api_access_reason = ('invalid_citizen_id', 'เลขบัตรประชาชนไม่ถูกต้อง')
+            return Response({'success': False, 'detail': 'Invalid citizen id'}, status=status.HTTP_400_BAD_REQUEST)
+        if not first_name or not last_name:
+            return Response({'success': False, 'detail': 'Missing first_name or last_name'}, status=status.HTTP_400_BAD_REQUEST)
+
+        member, _created = ExternalMember.objects.get_or_create(
+            citizen_id=citizen_id,
+            defaults={'first_name': first_name, 'last_name': last_name},
+        )
+        # ถ้าเป็นสมาชิกถาวรที่อนุมัติแล้ว ไม่รีเซ็ตสถานะ (กันเผลอถอนสิทธิ์)
+        if member.member_type == ExternalMember.TYPE_PERMANENT and member.status == ExternalMember.STATUS_ACTIVE:
+            return Response({'success': False, 'detail': 'Member already approved as permanent'}, status=status.HTTP_409_CONFLICT)
+
+        member.first_name = first_name
+        member.last_name = last_name
+        member.member_type = ExternalMember.TYPE_PERMANENT
+        member.status = ExternalMember.STATUS_PENDING
+        if photo:
+            member.photo = photo
+        member.save()
+        return Response({'success': True, 'member': ExternalMemberSerializerV2(member).data}, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['get'], url_path='permanent')
+    def permanent_list(self, request):
+        """list สมาชิกถาวร (filter ตาม status ได้: ?status=pending|active|revoked)"""
+        qs = ExternalMember.objects.filter(member_type=ExternalMember.TYPE_PERMANENT)
+        status_f = request.query_params.get('status')
+        if status_f:
+            qs = qs.filter(status=status_f)
+        qs = qs.order_by('-registered_at')
+        return Response({'results': ExternalMemberSerializerV2(qs, many=True).data})
+
+    @action(detail=False, methods=['get'], url_path='permanent/(?P<citizen_id>[0-9]{13})')
+    def permanent_detail(self, request, citizen_id=None):
+        """รายละเอียดสมาชิกถาวรรายคน"""
+        member = ExternalMember.objects.filter(
+            citizen_id=citizen_id, member_type=ExternalMember.TYPE_PERMANENT
+        ).first()
+        if member is None:
+            return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(ExternalMemberSerializerV2(member).data)
+
+    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9]{13})/approve')
+    def permanent_approve(self, request, citizen_id=None):
+        """admin อนุมัติ → ออก permanent_code (ถ้ายังไม่มี) + status=active (idempotent)"""
+        with transaction.atomic():
+            member = ExternalMember.objects.select_for_update().filter(
+                citizen_id=citizen_id, member_type=ExternalMember.TYPE_PERMANENT
+            ).first()
+            if member is None:
+                return Response({'success': False, 'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            if not member.permanent_code:
+                code = _gen_permanent_code()
+                if code is None:
+                    return Response({'success': False, 'detail': 'Cannot allocate permanent code'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                member.permanent_code = code
+            member.status = ExternalMember.STATUS_ACTIVE
+            member.approved_at = timezone.now()
+            member.approved_by = getattr(request.user, 'username', None)
+            member.save(update_fields=['permanent_code', 'status', 'approved_at', 'approved_by'])
+
+        return Response({'success': True, 'member': ExternalMemberSerializerV2(member).data}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9]{13})/revoke')
+    def permanent_revoke(self, request, citizen_id=None):
+        """admin ระงับ → status=revoked (รหัสถาวรใช้ไม่ได้ทันที)"""
+        member = ExternalMember.objects.filter(
+            citizen_id=citizen_id, member_type=ExternalMember.TYPE_PERMANENT
+        ).first()
+        if member is None:
+            return Response({'success': False, 'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        member.status = ExternalMember.STATUS_REVOKED
+        member.save(update_fields=['status'])
+        return Response({'success': True, 'member': ExternalMemberSerializerV2(member).data}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='permanent/(?P<citizen_id>[0-9]{13})/photo')
+    def permanent_photo(self, request, citizen_id=None):
+        """ส่งไฟล์รูป (ต้องใช้ JWT — ไม่เปิดสาธารณะ) ให้ reserv proxy ไป render บัตร"""
+        member = ExternalMember.objects.filter(citizen_id=citizen_id).first()
+        if member is None or not member.photo:
+            return Response({'detail': 'No photo'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            f = member.photo.open('rb')
+        except (FileNotFoundError, ValueError):
+            return Response({'detail': 'No photo'}, status=status.HTTP_404_NOT_FOUND)
+        content_type = mimetypes.guess_type(member.photo.name)[0] or 'application/octet-stream'
+        return FileResponse(f, content_type=content_type)
 
 #----------------------------------------------
 class MikroTikHotspotViewSetV2(JWTV2Authentication, viewsets.ViewSet):

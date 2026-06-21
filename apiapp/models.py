@@ -158,16 +158,34 @@ class ExternalMember(models.Model):
 
     ไม่มีใน AD (และเราแตะ AD ไม่ได้) ไม่มีใน StudentsInfo/StaffInfo → เก็บตัวตนเองในตารางนี้
     (Django-managed เขียนได้). กุญแจ = เลขบัตร ปชช. 13 หลัก (ตรวจ checksum ตอนลงทะเบียน).
-    ลงทะเบียนเอง อนุมัติทันที. การ "เข้าใช้งาน" ใช้รหัส 10 หลักใน ExternalAccessCode (pool รายวัน).
+
+    มี 2 ประเภท (member_type):
+    - daily     : ลงทะเบียนเองอนุมัติทันที (status=active) ใช้รหัส 10 หลักจาก ExternalAccessCode (pool รายวัน)
+    - permanent : เช่น พนักงานส่งเอกสาร — admin อนุมัติก่อน (เริ่ม pending → active) ได้ permanent_code
+                  คงที่ใช้ได้ทุกวันจนกว่าจะ revoked, มี photo สำหรับทำบัตร (reserv จัดการที่ /manage/)
     """
+    STATUS_PENDING = 'pending'
     STATUS_ACTIVE = 'active'
     STATUS_REVOKED = 'revoked'
-    STATUS_CHOICES = [(STATUS_ACTIVE, 'active'), (STATUS_REVOKED, 'revoked')]
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'pending'),
+        (STATUS_ACTIVE, 'active'),
+        (STATUS_REVOKED, 'revoked'),
+    ]
+
+    TYPE_DAILY = 'daily'
+    TYPE_PERMANENT = 'permanent'
+    TYPE_CHOICES = [(TYPE_DAILY, 'daily'), (TYPE_PERMANENT, 'permanent')]
 
     citizen_id = models.CharField(max_length=13, primary_key=True)  # เลขบัตร ปชช. (ผ่าน checksum)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
+    member_type = models.CharField(max_length=10, choices=TYPE_CHOICES, default=TYPE_DAILY, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+    permanent_code = models.CharField(max_length=10, unique=True, blank=True, null=True, db_index=True)  # รหัสถาวร (สมาชิกถาวรเท่านั้น) ออกตอน approve
+    photo = models.ImageField(upload_to='external_member_photos/', blank=True, null=True)  # รูปสำหรับทำบัตร
+    approved_at = models.DateTimeField(blank=True, null=True)
+    approved_by = models.CharField(max_length=150, blank=True, null=True)  # username ของ JWT ที่อนุมัติ
     registered_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:

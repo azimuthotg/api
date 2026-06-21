@@ -153,6 +153,12 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 
+# Media (เก็บไฟล์อัปโหลด เช่น รูปบัตรสมาชิกภายนอกถาวร)
+# หมายเหตุ: รูปสมาชิกเป็น PII — ไม่เปิด media สาธารณะ ให้ดึงผ่าน endpoint ที่ต้องใช้ JWT
+# (ExternalAccessViewSetV2.permanent_photo) เท่านั้น MEDIA_ROOT ใช้เป็นที่จัดเก็บไฟล์
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field

@@ -105,6 +105,19 @@
 |--------|-----|-----------|
 | GET | `/v2/library/check_user_walai/{user_ldap}/` | ตรวจสอบสมาชิกห้องสมุด (format ใหม่) |
 
+### บุคคลภายนอกเข้าห้องสมุด — `/v2/external/`
+
+| Method | URL | Body/Params | คำอธิบาย |
+|--------|-----|-------------|-----------|
+| POST | `/v2/external/issue/` | `citizen_id`, `first_name`, `last_name` | ออกรหัสรายวัน (pool) → `access_code` 10 หลัก ใช้ได้เฉพาะวันนี้ |
+| GET/POST | `/v2/external/check/{code}/` | — | ประตูเช็ครหัส → `allow` (รับทั้งรหัสรายวัน + permanent_code) |
+| POST | `/v2/external/permanent/register/` | multipart: `citizen_id`, `first_name`, `last_name`, `photo` | ลงทะเบียนสมาชิกถาวร → สถานะ `pending` |
+| GET | `/v2/external/permanent/` | `?status=pending\|active\|revoked` | list สมาชิกถาวร |
+| GET | `/v2/external/permanent/{citizen_id}/` | — | รายละเอียดสมาชิกถาวร |
+| POST | `/v2/external/permanent/{citizen_id}/approve/` | — | อนุมัติ → ออก `permanent_code` (คงที่) + `active` |
+| POST | `/v2/external/permanent/{citizen_id}/revoke/` | — | ระงับ → รหัสใช้ไม่ได้ทันที |
+| GET | `/v2/external/permanent/{citizen_id}/photo/` | — | รูปสมาชิก (JWT — ไม่เปิดสาธารณะ) |
+
 ### MikroTik Hotspot — `/v2/mt/`
 
 | Method | URL | Query Params | คำอธิบาย |

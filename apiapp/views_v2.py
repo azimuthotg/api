@@ -522,7 +522,9 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
                 member.permanent_code = code
             member.status = ExternalMember.STATUS_ACTIVE
             member.approved_at = timezone.now()
-            member.approved_by = getattr(request.user, 'username', None)
+            # ใช้ชื่อ staff ที่ client (reserv) ส่งมาถ้ามี ไม่งั้น fallback เป็น username ของ JWT
+            approved_by = (request.data.get('approved_by') or '').strip()[:150]
+            member.approved_by = approved_by or getattr(request.user, 'username', None)
             member.save(update_fields=['permanent_code', 'status', 'approved_at', 'approved_by'])
 
         return Response({'success': True, 'member': ExternalMemberSerializerV2(member).data}, status=status.HTTP_200_OK)

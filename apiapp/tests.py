@@ -8,16 +8,18 @@ from .models import ExternalMember
 from .views_v2 import ExternalAccessViewSetV2
 
 
-def _call_approve(citizen_id, user, data=None):
-    """เรียก action permanent_approve ตรง ๆ (ข้าม dispatch → ไม่แตะ JWT auth/access-log mixin)
-    เพื่อทดสอบเฉพาะ logic การเลือก approved_by
-    """
-    raw = APIRequestFactory().post(f'/v2/external/permanent/{citizen_id}/approve/', data or {})
+def _call_action(action_name, citizen_id, user, data=None):
+    """เรียก action ของ ExternalAccessViewSetV2 ตรง ๆ (ข้าม dispatch → ไม่แตะ JWT auth/access-log mixin)"""
+    raw = APIRequestFactory().post(f'/v2/external/permanent/{citizen_id}/{action_name}/', data or {})
     drf_req = Request(raw, parsers=[FormParser(), MultiPartParser(), JSONParser()])
     drf_req.user = user
     view = ExternalAccessViewSetV2()
     view.request = drf_req
-    return view.permanent_approve(drf_req, citizen_id=citizen_id)
+    return getattr(view, action_name)(drf_req, citizen_id=citizen_id)
+
+
+def _call_approve(citizen_id, user, data=None):
+    return _call_action('permanent_approve', citizen_id, user, data)
 
 
 class PermanentApproveApprovedByTests(TestCase):
@@ -50,3 +52,34 @@ class PermanentApproveApprovedByTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.member.refresh_from_db()
         self.assertEqual(self.member.approved_by, 'reserv')
+
+
+class PermanentDeleteTests(TestCase):
+    """endpoint delete — hard delete สมาชิกถาวรออกจาก DB ทุกสถานะ"""
+
+    def setUp(self):
+        self.jwt_user = User.objects.create_user(username='reserv', password='x')
+
+    def _make(self, citizen_id, status_):
+        return ExternalMember.objects.create(
+            citizen_id=citizen_id, first_name='ทดสอบ', last_name='ลบ',
+            member_type=ExternalMember.TYPE_PERMANENT, status=status_,
+        )
+
+    def test_delete_active_member_removes_record(self):
+        m = self._make('3489900017383', ExternalMember.STATUS_ACTIVE)
+        m.permanent_code = '1234567890'
+        m.save(update_fields=['permanent_code'])
+        resp = _call_action('permanent_delete', m.citizen_id, self.jwt_user)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(ExternalMember.objects.filter(citizen_id=m.citizen_id).exists())
+
+    def test_delete_pending_member_removes_record(self):
+        m = self._make('1101700207366', ExternalMember.STATUS_PENDING)
+        resp = _call_action('permanent_delete', m.citizen_id, self.jwt_user)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(ExternalMember.objects.filter(citizen_id=m.citizen_id).exists())
+
+    def test_delete_missing_returns_404(self):
+        resp = _call_action('permanent_delete', '9999999999999', self.jwt_user)
+        self.assertEqual(resp.status_code, 404)

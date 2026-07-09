@@ -541,6 +541,19 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
         member.save(update_fields=['status'])
         return Response({'success': True, 'member': ExternalMemberSerializerV2(member).data}, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9]{13})/delete')
+    def permanent_delete(self, request, citizen_id=None):
+        """admin ลบสมาชิกถาวรออกจากระบบ (hard delete) — ปลดล็อก citizen_id + permanent_code + ลบรูป"""
+        member = ExternalMember.objects.filter(
+            citizen_id=citizen_id, member_type=ExternalMember.TYPE_PERMANENT
+        ).first()
+        if member is None:
+            return Response({'success': False, 'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        if member.photo:
+            member.photo.delete(save=False)  # ลบไฟล์รูปทิ้งด้วย ไม่ให้ค้าง
+        member.delete()
+        return Response({'success': True}, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'], url_path='permanent/(?P<citizen_id>[0-9]{13})/photo')
     def permanent_photo(self, request, citizen_id=None):
         """ส่งไฟล์รูป (ต้องใช้ JWT — ไม่เปิดสาธารณะ) ให้ reserv proxy ไป render บัตร"""

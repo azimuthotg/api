@@ -1,3 +1,19 @@
+<!-- PROJECT-STATUS
+name: apiproject (NPU API Backend)
+status: active
+deployment: production
+progress: 84
+phase: API หลักใช้งาน production จริง · external library member (permanent) integration กับ reserv เสร็จ+prod verified
+done_2026-07-09:
+  - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
+  - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
+next:
+  - ขยาย test coverage ให้ครอบคลุม endpoint อื่น (ปัจจุบันมีแค่ external member permanent)
+  - ทำความสะอาดไฟล์ untracked ที่เป็นสำเนา/backup (views copy.py, settings 21032568.py, home 25092567.html, โฟลเดอร์ tests/ เป็นต้น)
+  - traceon route (door team) เพิ่ม route 10 หลัก → `/v2/external/check/` — งานนอก repo นี้ ติดตามผ่าน reserv handoff
+updated: 2026-07-09
+-->
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -80,3 +96,8 @@ JWT tokens have a 365-day access lifetime (configured in `settings.py`).
 - CORS allowed origins are explicitly listed in `settings.py` (includes production domains `api.npu.ac.th`, `rdb.npu.ac.th`, `arc.npu.ac.th`)
 - Static files served via WhiteNoise middleware; collected to `/static/`
 - Response timing logged via custom middleware in `apiproject/middleware.py`
+
+## กติกาการปิด session
+ก่อนจบงานทุกครั้ง ให้อัปเดตบล็อก <!-- PROJECT-STATUS --> ด้านบนของไฟล์นี้:
+ปรับ progress, phase, รายการ next ให้ตรงกับงานจริง และแก้ updated เป็นวันที่ปัจจุบัน
+จากนั้นรัน `python C:\projects\project_status.py` เพื่ออัปเดต dashboard รวม

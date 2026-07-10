@@ -47,6 +47,18 @@ def _gen_permanent_code():
             return code
     return None
 
+
+def _gen_external_ref_id():
+    """ID อ้างอิงแทนเลขบัตร ปชช. สำหรับบุคคลสำคัญที่ไม่สะดวกให้เลขบัตร (ลงทะเบียนถาวรโดย staff)
+    รูปแบบ V + เลขสุ่ม 12 หลัก (รวม 13 ตัว เท่า PK เดิม, ไม่ชนเลขบัตรจริงซึ่งเป็นตัวเลขล้วน)
+    คืน str หรือ None เมื่อหาไม่ได้
+    """
+    for _ in range(10000):
+        ref = 'V' + str(random.randint(0, 999_999_999_999)).zfill(12)
+        if not ExternalMember.objects.filter(citizen_id=ref).exists():
+            return ref
+    return None
+
 class UserViewSetV2(BindLoggingCreateMixin, JWTV2Authentication, viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializerV2
@@ -456,15 +468,24 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
     @action(detail=False, methods=['post'], url_path='permanent/register',
             parser_classes=[MultiPartParser, FormParser])
     def permanent_register(self, request):
-        """ลงทะเบียนสมาชิกถาวร: citizen_id + ชื่อ-สกุล + photo → สร้าง pending รออนุมัติ"""
+        """ลงทะเบียนสมาชิกถาวร: citizen_id + ชื่อ-สกุล + photo → สร้าง pending รออนุมัติ
+
+        citizen_id เว้นว่างได้ (บุคคลสำคัญที่ไม่สะดวกให้เลขบัตร เช่น นายกสภาฯ — staff ลงทะเบียนให้)
+        → ระบบออก ID อ้างอิงขึ้นต้น V ให้แทน; ถ้าส่งมาต้องผ่าน checksum เหมือนเดิม
+        """
         citizen_id = (request.data.get('citizen_id') or '').strip()
         first_name = (request.data.get('first_name') or '').strip()
         last_name = (request.data.get('last_name') or '').strip()
         photo = request.FILES.get('photo')
 
-        if not is_valid_thai_citizen_id(citizen_id):
-            request._api_access_reason = ('invalid_citizen_id', 'เลขบัตรประชาชนไม่ถูกต้อง')
-            return Response({'success': False, 'detail': 'Invalid citizen id'}, status=status.HTTP_400_BAD_REQUEST)
+        if citizen_id:
+            if not is_valid_thai_citizen_id(citizen_id):
+                request._api_access_reason = ('invalid_citizen_id', 'เลขบัตรประชาชนไม่ถูกต้อง')
+                return Response({'success': False, 'detail': 'Invalid citizen id'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            citizen_id = _gen_external_ref_id()
+            if citizen_id is None:
+                return Response({'success': False, 'detail': 'Cannot allocate reference id'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         if not first_name or not last_name:
             return Response({'success': False, 'detail': 'Missing first_name or last_name'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -495,7 +516,7 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
         qs = qs.order_by('-registered_at')
         return Response({'results': ExternalMemberSerializerV2(qs, many=True).data})
 
-    @action(detail=False, methods=['get'], url_path='permanent/(?P<citizen_id>[0-9]{13})')
+    @action(detail=False, methods=['get'], url_path='permanent/(?P<citizen_id>[0-9V][0-9]{12})')
     def permanent_detail(self, request, citizen_id=None):
         """รายละเอียดสมาชิกถาวรรายคน"""
         member = ExternalMember.objects.filter(
@@ -505,7 +526,7 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
             return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response(ExternalMemberSerializerV2(member).data)
 
-    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9]{13})/approve')
+    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9V][0-9]{12})/approve')
     def permanent_approve(self, request, citizen_id=None):
         """admin อนุมัติ → ออก permanent_code (ถ้ายังไม่มี) + status=active (idempotent)"""
         with transaction.atomic():
@@ -529,7 +550,7 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
 
         return Response({'success': True, 'member': ExternalMemberSerializerV2(member).data}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9]{13})/revoke')
+    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9V][0-9]{12})/revoke')
     def permanent_revoke(self, request, citizen_id=None):
         """admin ระงับ → status=revoked (รหัสถาวรใช้ไม่ได้ทันที)"""
         member = ExternalMember.objects.filter(
@@ -541,7 +562,7 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
         member.save(update_fields=['status'])
         return Response({'success': True, 'member': ExternalMemberSerializerV2(member).data}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9]{13})/delete')
+    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9V][0-9]{12})/delete')
     def permanent_delete(self, request, citizen_id=None):
         """admin ลบสมาชิกถาวรออกจากระบบ (hard delete) — ปลดล็อก citizen_id + permanent_code + ลบรูป"""
         member = ExternalMember.objects.filter(
@@ -554,7 +575,7 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
         member.delete()
         return Response({'success': True}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['get'], url_path='permanent/(?P<citizen_id>[0-9]{13})/photo')
+    @action(detail=False, methods=['get'], url_path='permanent/(?P<citizen_id>[0-9V][0-9]{12})/photo')
     def permanent_photo(self, request, citizen_id=None):
         """ส่งไฟล์รูป (ต้องใช้ JWT — ไม่เปิดสาธารณะ) ให้ reserv proxy ไป render บัตร"""
         member = ExternalMember.objects.filter(citizen_id=citizen_id).first()

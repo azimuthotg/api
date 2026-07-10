@@ -4,14 +4,17 @@ status: active
 deployment: production
 progress: 84
 phase: API หลักใช้งาน production จริง · external library member (permanent) integration กับ reserv เสร็จ+prod verified
+done_2026-07-10:
+  - ✅ permanent_register ไม่บังคับ citizen_id (รองรับ VVIP เช่น นายกสภาฯ) — เว้นว่างแล้ว gen รหัสอ้างอิง `V`+12 หลัก, ขยาย url regex รับ `V…`, ไม่มี migration, test 10/10 — **รอ deploy prod + e2e กับ reserv**
 done_2026-07-09:
   - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
   - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
 next:
+  - deploy prod (git pull + restart, ไม่มี migration) + ทดสอบ e2e ร่วมกับ reserv (ดู doc/progress-2026-07-10.md)
   - ขยาย test coverage ให้ครอบคลุม endpoint อื่น (ปัจจุบันมีแค่ external member permanent)
   - ทำความสะอาดไฟล์ untracked ที่เป็นสำเนา/backup (views copy.py, settings 21032568.py, home 25092567.html, โฟลเดอร์ tests/ เป็นต้น)
   - traceon route (door team) เพิ่ม route 10 หลัก → `/v2/external/check/` — งานนอก repo นี้ ติดตามผ่าน reserv handoff
-updated: 2026-07-09
+updated: 2026-07-10
 -->
 
 # CLAUDE.md

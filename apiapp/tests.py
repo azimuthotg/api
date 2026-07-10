@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import resolve
 from rest_framework.request import Request
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.test import APIRequestFactory
@@ -83,3 +84,67 @@ class PermanentDeleteTests(TestCase):
     def test_delete_missing_returns_404(self):
         resp = _call_action('permanent_delete', '9999999999999', self.jwt_user)
         self.assertEqual(resp.status_code, 404)
+
+
+def _call_register(user, data):
+    """เรียก permanent_register ตรง ๆ (detail=False ไม่มี citizen_id ใน path)"""
+    raw = APIRequestFactory().post('/v2/external/permanent/register/', data)
+    drf_req = Request(raw, parsers=[FormParser(), MultiPartParser(), JSONParser()])
+    drf_req.user = user
+    view = ExternalAccessViewSetV2()
+    view.request = drf_req
+    return view.permanent_register(drf_req)
+
+
+class PermanentRegisterNoCitizenIdTests(TestCase):
+    """ลงทะเบียนถาวรโดยไม่ใส่เลขบัตร (บุคคลสำคัญ/VVIP) → ระบบออก ID อ้างอิงขึ้นต้น V ให้"""
+
+    def setUp(self):
+        self.jwt_user = User.objects.create_user(username='reserv', password='x')
+
+    def test_register_without_citizen_id_generates_ref_id(self):
+        resp = _call_register(self.jwt_user, {'first_name': 'นายก', 'last_name': 'สภามหาวิทยาลัย'})
+        self.assertEqual(resp.status_code, 201)
+        cid = resp.data['member']['citizen_id']
+        self.assertEqual(len(cid), 13)
+        self.assertTrue(cid.startswith('V'))
+        self.assertTrue(cid[1:].isdigit())
+        member = ExternalMember.objects.get(citizen_id=cid)
+        self.assertEqual(member.member_type, ExternalMember.TYPE_PERMANENT)
+        self.assertEqual(member.status, ExternalMember.STATUS_PENDING)
+
+    def test_register_with_invalid_citizen_id_still_400(self):
+        # เว้นว่างเท่านั้นที่ gen ให้ — กรอกมาแต่ checksum ผิด ต้อง 400 เหมือนเดิม
+        resp = _call_register(self.jwt_user, {
+            'citizen_id': '1234567890123', 'first_name': 'ก', 'last_name': 'ข',
+        })
+        self.assertEqual(resp.status_code, 400)
+
+    def test_ref_id_member_full_flow_approve_and_gate_check(self):
+        # ลงทะเบียน (ไม่มีเลขบัตร) → approve → เช็คที่ประตูด้วย permanent_code ต้อง allow
+        reg = _call_register(self.jwt_user, {'first_name': 'นายก', 'last_name': 'สภามหาวิทยาลัย'})
+        cid = reg.data['member']['citizen_id']
+
+        approve = _call_action('permanent_approve', cid, self.jwt_user, {'approved_by': 'admin_e'})
+        self.assertEqual(approve.status_code, 200)
+        member = ExternalMember.objects.get(citizen_id=cid)
+        self.assertEqual(member.status, ExternalMember.STATUS_ACTIVE)
+        self.assertTrue(member.permanent_code)
+
+        raw = APIRequestFactory().get(f'/v2/external/check/{member.permanent_code}/')
+        drf_req = Request(raw)
+        drf_req.user = self.jwt_user
+        view = ExternalAccessViewSetV2()
+        view.request = drf_req
+        check = view.check_external(drf_req, code=member.permanent_code)
+        self.assertEqual(check.status_code, 200)
+        self.assertTrue(check.data['allow'])
+        self.assertEqual(check.data['member']['citizen_id'], cid)
+
+    def test_url_routes_accept_v_prefixed_id(self):
+        # regex ใน url_path ต้อง match ID ขึ้นต้น V (และยัง match เลขบัตรจริง 13 หลัก)
+        for cid in ('V000000000001', '3489900017383'):
+            for suffix in ('', 'approve/', 'revoke/', 'delete/', 'photo/'):
+                match = resolve(f'/v2/external/permanent/{cid}/{suffix}')
+                self.assertEqual(match.kwargs.get('citizen_id'), cid,
+                                 f'route ไม่ match: {cid}/{suffix}')

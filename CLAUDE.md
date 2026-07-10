@@ -10,6 +10,7 @@ done_2026-07-09:
   - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
   - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
 next:
+  - ⚠️ push ค้าง (commit แล้วบน main) — GitHub token ใน WSL credential store หมดอายุ → สร้าง PAT ใหม่ หรือ push จากฝั่ง Windows (`C:\projects\apiproject`)
   - deploy prod (git pull + restart, ไม่มี migration) + ทดสอบ e2e ร่วมกับ reserv (ดู doc/progress-2026-07-10.md)
   - ขยาย test coverage ให้ครอบคลุม endpoint อื่น (ปัจจุบันมีแค่ external member permanent)
   - ทำความสะอาดไฟล์ untracked ที่เป็นสำเนา/backup (views copy.py, settings 21032568.py, home 25092567.html, โฟลเดอร์ tests/ เป็นต้น)

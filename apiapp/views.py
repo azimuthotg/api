@@ -235,16 +235,7 @@ class MikroTikHotspotViewSet(viewsets.ViewSet):
 
 #--------------------------------------------------------------------------
 # ลบการประกาศตัวแปรเหล่านี้
-# ตั้งค่าข้อมูล Home Assistant
-# HA_IP = "202.29.55.30"  # IP ภายนอกของ Mikrotik
-# HA_PORT = 8123          # Port ของ Home Assistant (8123 โดยปกติ)
-# HA_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1MTA4ZWRmNTU3Yzc0MjA2OTM4Njk3YjU0YTM3NDlmMCIsImlhdCI6MTcyOTk1NDMwMywiZXhwIjoyMDQ1MzE0MzAzfQ.0089Kp8tiXkkVGRweVRyD-pmXdRlJAlsXvyLOCopb7I"  # ใส่ Token ของ Home Assistant
-
-# ลบการประกาศตัวแปร headers ที่ใช้ค่าคงที่
-# headers = {
-#     "Authorization": f"Bearer {HA_TOKEN}",
-#     "Content-Type": "application/json"
-# }
+# ค่า Home Assistant (HA_IP / HA_PORT / HA_TOKEN) อ่านจาก settings → .env
 
 class SonoffControlViewSet(viewsets.ViewSet):
     """

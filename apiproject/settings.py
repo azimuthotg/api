@@ -206,7 +206,8 @@ MIKROTIK_PASSWORD = env('MIKROTIK_PASSWORD', default='41132834@ake@1')
 # Home Assistant settings
 HA_IP = env('HA_IP', default='202.29.55.30')
 HA_PORT = env('HA_PORT', default='8123')
-HA_TOKEN = env('HA_TOKEN', default='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1MTA4ZWRmNTU3Yzc0MjA2OTM4Njk3YjU0YTM3NDlmMCIsImlhdCI6MTcyOTk1NDMwMywiZXhwIjoyMDQ1MzE0MzAzfQ.0089Kp8tiXkkVGRweVRyD-pmXdRlJAlsXvyLOCopb7I')
+# HA_TOKEN เป็น secret: ต้องกำหนดใน .env (ไม่มี default hardcode) — ก่อน deploy prod ต้องมีใน .env ของ prod
+HA_TOKEN = env('HA_TOKEN', default='')
 
 # Walai API settings — token เป็น secret: ต้องกำหนดใน .env (ไม่มี default hardcode)
 WALAI_API_TOKEN = env('WALAI_API_TOKEN', default='')

@@ -2,8 +2,14 @@
 name: apiproject (NPU API Backend)
 status: active
 deployment: production
-progress: 87
-phase: API หลักใช้งาน production จริง · external library member (permanent, รองรับ VVIP ไม่บังคับเลขบัตร) integration กับ reserv เสร็จ+prod verified+e2e ผ่าน — เหลือรอทีมประตูเทส QR code
+progress: 88
+phase: API หลักใช้งาน production จริง · external member integration เสร็จ+prod verified · secret (Walai+HA token) ย้ายเข้า .env แล้ว prod verified · เริ่มลง test coverage เส้น external — เหลือรอทีมประตูเทส QR + งานศึกษา security/API mgmt
+done_2026-07-13:
+  - ✅ ทำความสะอาดไฟล์ untracked สำเนา/backup 7 ไฟล์ (ไฟล์เก่าปี 2024/ต้นปี 2025 ไม่ตรงโค้ดปัจจุบัน)
+  - ✅ ส่งมอบเอกสาร Word คู่มือ API ให้ทีมประตู (doc/คู่มือทีมประตู-external-check-api.docx — untracked) + ทดสอบยิง /v2/external/check/ บน prod ผ่าน (permanent VVIP รหัส V… allow:true)
+  - ✅ เพิ่ม test เส้นรหัสรายวัน external (DailyPoolAccessCodeTests 10 เคส: issue + check_external รายวัน) — รวม apiapp/tests.py 20/20 ผ่าน
+  - ✅ ย้าย WALAI_API_TOKEN ออกจาก hardcode default (settings.py → '') + test_walai_search.py อ่านจาก .env — deploy prod + เทสเช็คสมาชิก Walai ผ่าน
+  - ✅ ย้าย HA_TOKEN ออกจาก hardcode default (settings.py → '') + ลบ comment token ตกค้างใน views.py — deploy prod + เทสเปิด/ปิด IoT (Sonoff) ผ่าน
 done_2026-07-10:
   - ✅ push ค้าง 2 commits ขึ้น GitHub สำเร็จ (แก้จากฝั่ง Windows แทน WSL token ที่หมดอายุ)
   - ✅ deploy prod (git pull + restart) เรียบร้อย, เทส prod ผ่าน — permanent_register ไม่บังคับ citizen_id (VVIP) ทำงานถูกต้อง
@@ -11,14 +17,14 @@ done_2026-07-10:
 done_2026-07-09:
   - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
   - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
-done_2026-07-13:
-  - ✅ ทำความสะอาดไฟล์ untracked ที่เป็นสำเนา/backup 7 ไฟล์ (views copy.py, settings 21032568.py, home 25092567.html, home_url copy.html, room_control copy.html, views lineliff.py ฯลฯ) — ลบแล้วยืนยันเป็นไฟล์เก่าปี 2024/ต้นปี 2025 ไม่ตรงกับโค้ดปัจจุบัน
 next:
-  - แจ้งทีมประตูให้เอา QR code ไปทดสอบว่าเข้าได้จริงหรือไม่ (route `/v2/external/check/` พร้อมแล้วฝั่ง API, รอทีมประตูเพิ่ม route 10 หลักและทดสอบ)
-  - ขยาย test coverage ให้ครอบคลุม endpoint อื่น (ปัจจุบันมีแค่ external member permanent, มี tests/test_walai_search.py ใหม่ยังไม่ commit)
-  - ย้าย HA_TOKEN (Home Assistant) ออกจาก hardcode default ใน settings.py → .env แล้วเปลี่ยน default เป็น '' (แบบเดียวกับ WALAI_API_TOKEN ที่ทำไป 2026-07-13) — ก่อน deploy ต้องเพิ่ม HA_TOKEN ใน .env ของ prod ก่อน ไม่งั้น IoT control พัง
+  - แจ้งทีมประตูให้เอา QR code ไปทดสอบว่าเข้าได้จริงหรือไม่ (route `/v2/external/check/` พร้อมแล้วฝั่ง API + ส่งเอกสารคู่มือแล้ว, รอทีมประตูเพิ่ม route 10 หลักและทดสอบกับเครื่องสแกนจริง)
+  - ขยาย test coverage endpoint กลุ่มที่ต่อระบบภายนอก (LDAP/Walai/MikroTik/Sonoff) — ต้อง mock (ปัจจุบันคุมแค่ external member ทั้ง permanent + daily)
+  - ทำความสะอาดไฟล์ backup local ที่มี secret ตกค้าง (code_deploy/, settings27062025.py — gitignore อยู่ ไม่หลุด repo แต่ยังมี token เก่าในเครื่อง)
   - ศึกษา security ที่ต้องทำสำหรับ API นี้ (เช่น auth/rate-limit/input validation/HTTPS — ยังไม่ได้กำหนดขอบเขต) — รับแจ้ง 2026-07-12
   - ศึกษาการบริหารจัดการ API ในภาพรวม (API management/versioning/monitoring/gateway ฯลฯ) — รับแจ้ง 2026-07-12
+risks:
+  - secret เคย hardcode ใน settings.py (Walai+HA token) — ย้ายเข้า .env แล้ว 2026-07-13; เหลือสำเนา token เก่าในไฟล์ backup local (gitignore)
 updated: 2026-07-13
 -->
 

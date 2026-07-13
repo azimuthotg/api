@@ -208,8 +208,8 @@ HA_IP = env('HA_IP', default='202.29.55.30')
 HA_PORT = env('HA_PORT', default='8123')
 HA_TOKEN = env('HA_TOKEN', default='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI1MTA4ZWRmNTU3Yzc0MjA2OTM4Njk3YjU0YTM3NDlmMCIsImlhdCI6MTcyOTk1NDMwMywiZXhwIjoyMDQ1MzE0MzAzfQ.0089Kp8tiXkkVGRweVRyD-pmXdRlJAlsXvyLOCopb7I')
 
-# Walai API settings
-WALAI_API_TOKEN = env('WALAI_API_TOKEN', default='3YhnCZzmyr+8HELDMzufoZ6vccyK1KIoAl30SdYhoFLJD8pRV8emesbLSSya2/NgtjY1dMaqzvClDSHFzF4B3A==')
+# Walai API settings — token เป็น secret: ต้องกำหนดใน .env (ไม่มี default hardcode)
+WALAI_API_TOKEN = env('WALAI_API_TOKEN', default='')
 WALAI_API_URL = env('WALAI_API_URL', default='https://opacapi.npu.ac.th/v3/api/GetPublicPatronData')
 
 # ถ้าอยากอนุญาตเฉพาะ localhost:3000

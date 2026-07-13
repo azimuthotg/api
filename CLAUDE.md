@@ -16,6 +16,7 @@ done_2026-07-13:
 next:
   - แจ้งทีมประตูให้เอา QR code ไปทดสอบว่าเข้าได้จริงหรือไม่ (route `/v2/external/check/` พร้อมแล้วฝั่ง API, รอทีมประตูเพิ่ม route 10 หลักและทดสอบ)
   - ขยาย test coverage ให้ครอบคลุม endpoint อื่น (ปัจจุบันมีแค่ external member permanent, มี tests/test_walai_search.py ใหม่ยังไม่ commit)
+  - ย้าย HA_TOKEN (Home Assistant) ออกจาก hardcode default ใน settings.py → .env แล้วเปลี่ยน default เป็น '' (แบบเดียวกับ WALAI_API_TOKEN ที่ทำไป 2026-07-13) — ก่อน deploy ต้องเพิ่ม HA_TOKEN ใน .env ของ prod ก่อน ไม่งั้น IoT control พัง
   - ศึกษา security ที่ต้องทำสำหรับ API นี้ (เช่น auth/rate-limit/input validation/HTTPS — ยังไม่ได้กำหนดขอบเขต) — รับแจ้ง 2026-07-12
   - ศึกษาการบริหารจัดการ API ในภาพรวม (API management/versioning/monitoring/gateway ฯลฯ) — รับแจ้ง 2026-07-12
 updated: 2026-07-13

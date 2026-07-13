@@ -2,20 +2,23 @@
 name: apiproject (NPU API Backend)
 status: active
 deployment: production
-progress: 84
-phase: API หลักใช้งาน production จริง · external library member (permanent) integration กับ reserv เสร็จ+prod verified
+progress: 87
+phase: API หลักใช้งาน production จริง · external library member (permanent, รองรับ VVIP ไม่บังคับเลขบัตร) integration กับ reserv เสร็จ+prod verified+e2e ผ่าน — เหลือรอทีมประตูเทส QR code
 done_2026-07-10:
-  - ✅ permanent_register ไม่บังคับ citizen_id (รองรับ VVIP เช่น นายกสภาฯ) — เว้นว่างแล้ว gen รหัสอ้างอิง `V`+12 หลัก, ขยาย url regex รับ `V…`, ไม่มี migration, test 10/10 — **รอ deploy prod + e2e กับ reserv**
+  - ✅ push ค้าง 2 commits ขึ้น GitHub สำเร็จ (แก้จากฝั่ง Windows แทน WSL token ที่หมดอายุ)
+  - ✅ deploy prod (git pull + restart) เรียบร้อย, เทส prod ผ่าน — permanent_register ไม่บังคับ citizen_id (VVIP) ทำงานถูกต้อง
+  - ✅ permanent_register ไม่บังคับ citizen_id (รองรับ VVIP เช่น นายกสภาฯ) — เว้นว่างแล้ว gen รหัสอ้างอิง `V`+12 หลัก, ขยาย url regex รับ `V…`, ไม่มี migration, test 10/10
 done_2026-07-09:
   - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
   - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
+done_2026-07-13:
+  - ✅ ทำความสะอาดไฟล์ untracked ที่เป็นสำเนา/backup 7 ไฟล์ (views copy.py, settings 21032568.py, home 25092567.html, home_url copy.html, room_control copy.html, views lineliff.py ฯลฯ) — ลบแล้วยืนยันเป็นไฟล์เก่าปี 2024/ต้นปี 2025 ไม่ตรงกับโค้ดปัจจุบัน
 next:
-  - ⚠️ push ค้าง (commit แล้วบน main) — GitHub token ใน WSL credential store หมดอายุ → สร้าง PAT ใหม่ หรือ push จากฝั่ง Windows (`C:\projects\apiproject`)
-  - deploy prod (git pull + restart, ไม่มี migration) + ทดสอบ e2e ร่วมกับ reserv (ดู doc/progress-2026-07-10.md)
-  - ขยาย test coverage ให้ครอบคลุม endpoint อื่น (ปัจจุบันมีแค่ external member permanent)
-  - ทำความสะอาดไฟล์ untracked ที่เป็นสำเนา/backup (views copy.py, settings 21032568.py, home 25092567.html, โฟลเดอร์ tests/ เป็นต้น)
-  - traceon route (door team) เพิ่ม route 10 หลัก → `/v2/external/check/` — งานนอก repo นี้ ติดตามผ่าน reserv handoff
-updated: 2026-07-10
+  - แจ้งทีมประตูให้เอา QR code ไปทดสอบว่าเข้าได้จริงหรือไม่ (route `/v2/external/check/` พร้อมแล้วฝั่ง API, รอทีมประตูเพิ่ม route 10 หลักและทดสอบ)
+  - ขยาย test coverage ให้ครอบคลุม endpoint อื่น (ปัจจุบันมีแค่ external member permanent, มี tests/test_walai_search.py ใหม่ยังไม่ commit)
+  - ศึกษา security ที่ต้องทำสำหรับ API นี้ (เช่น auth/rate-limit/input validation/HTTPS — ยังไม่ได้กำหนดขอบเขต) — รับแจ้ง 2026-07-12
+  - ศึกษาการบริหารจัดการ API ในภาพรวม (API management/versioning/monitoring/gateway ฯลฯ) — รับแจ้ง 2026-07-12
+updated: 2026-07-13
 -->
 
 # CLAUDE.md

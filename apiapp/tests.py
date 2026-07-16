@@ -214,6 +214,27 @@ class DailyPoolAccessCodeTests(TestCase):
         resp = _call_issue(self.jwt_user, {'citizen_id': VALID_ID_1, 'first_name': '', 'last_name': ''})
         self.assertEqual(resp.status_code, 400)
 
+    def test_issue_without_citizen_id_generates_ref_id(self):
+        # นโยบายใหม่: เลขบัตร optional — ไม่ส่งมา → gen ref id ขึ้นต้น V แล้วออกรหัสได้
+        resp = _call_issue(self.jwt_user, {'first_name': 'สม', 'last_name': 'ชาย'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data['success'])
+        ref = resp.data['member']['citizen_id']
+        self.assertTrue(ref.startswith('V'))
+        entry = ExternalAccessCode.objects.get(code=resp.data['access_code'])
+        self.assertEqual(entry.assigned_citizen_id, ref)
+        # ประตูต้อง allow รหัสนี้ได้ (member ref-id ถูกสร้างและไม่ถูกระงับ)
+        chk = _call_check(resp.data['access_code'], self.jwt_user)
+        self.assertEqual(chk.status_code, 200)
+        self.assertTrue(chk.data['allow'])
+
+    def test_issue_without_citizen_id_each_request_consumes_new_slot(self):
+        # ไม่มีเลขบัตร = แยกคนไม่ได้ → ไม่ dedupe, กินสล็อตใหม่ทุกครั้ง (ต่างจากเส้นมีเลขบัตร)
+        r1 = _call_issue(self.jwt_user, {'first_name': 'สม', 'last_name': 'ชาย'})
+        r2 = _call_issue(self.jwt_user, {'first_name': 'สม', 'last_name': 'ชาย'})
+        self.assertNotEqual(r1.data['access_code'], r2.data['access_code'])
+        self.assertEqual(ExternalAccessCode.objects.filter(assigned_date=_bkk_today()).count(), 2)
+
     def test_issue_revoked_member_403(self):
         ExternalMember.objects.create(citizen_id=VALID_ID_1, first_name='ก', last_name='ข',
                                       status=ExternalMember.STATUS_REVOKED)

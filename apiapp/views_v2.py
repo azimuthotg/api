@@ -364,16 +364,28 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
 
     @action(detail=False, methods=['post'])
     def issue(self, request):
-        """รับเลขบัตร 13 หลัก + ชื่อ-สกุล → ตรวจ checksum → สมัคร (อนุมัติทันที) → จองรหัสวันนี้"""
+        """รับชื่อ-สกุล (บังคับ) + เลขบัตร 13 หลัก (ไม่บังคับ) → จองรหัสวันนี้
+
+        นโยบายปัจจุบัน: บังคับแค่ชื่อ-สกุล เลขบัตรเป็น optional (เอาสะดวกผู้ใช้ก่อน)
+        - ส่งเลขบัตรมา → ตรวจ checksum, dedupe คนเดิมในวันเดียวได้ (คืนรหัสเดิม ไม่เปลือง slot),
+          revoke/quota ต่อคนได้
+        - ไม่ส่งเลขบัตร → gen ref id ขึ้นต้น V ให้ (เหมือน permanent_register); แต่ละครั้งเป็นคนใหม่
+          → ไม่ dedupe และกินสล็อต pool ทุกครั้ง (ยอมแลกกับความสะดวก) ดู [[external-library-member]]
+        """
         citizen_id = (request.data.get('citizen_id') or '').strip()
         first_name = (request.data.get('first_name') or '').strip()
         last_name = (request.data.get('last_name') or '').strip()
 
-        if not is_valid_thai_citizen_id(citizen_id):
-            request._api_access_reason = ('invalid_citizen_id', 'เลขบัตรประชาชนไม่ถูกต้อง')
-            return Response({'success': False, 'detail': 'Invalid citizen id'}, status=status.HTTP_400_BAD_REQUEST)
         if not first_name or not last_name:
             return Response({'success': False, 'detail': 'Missing first_name or last_name'}, status=status.HTTP_400_BAD_REQUEST)
+        if citizen_id:
+            if not is_valid_thai_citizen_id(citizen_id):
+                request._api_access_reason = ('invalid_citizen_id', 'เลขบัตรประชาชนไม่ถูกต้อง')
+                return Response({'success': False, 'detail': 'Invalid citizen id'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            citizen_id = _gen_external_ref_id()
+            if citizen_id is None:
+                return Response({'success': False, 'detail': 'Cannot allocate reference id'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         today = _bkk_today()
         with transaction.atomic():

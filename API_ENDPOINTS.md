@@ -109,7 +109,7 @@
 
 | Method | URL | Body/Params | คำอธิบาย |
 |--------|-----|-------------|-----------|
-| POST | `/v2/external/issue/` | `citizen_id`, `first_name`, `last_name` | ออกรหัสรายวัน (pool) → `access_code` 10 หลัก ใช้ได้เฉพาะวันนี้ |
+| POST | `/v2/external/issue/` | `first_name`, `last_name` (บังคับ), `citizen_id` (ไม่บังคับ) | ออกรหัสรายวัน (pool) → `access_code` 10 หลัก ใช้ได้เฉพาะวันนี้ — ไม่ส่ง `citizen_id` → gen ref id ขึ้นต้น `V` ให้ (ไม่ dedupe, กินสล็อต pool ทุกครั้ง) |
 | GET/POST | `/v2/external/check/{code}/` | — | ประตูเช็ครหัส → `allow` (รับทั้งรหัสรายวัน + permanent_code) |
 | POST | `/v2/external/permanent/register/` | multipart: `citizen_id` (เว้นว่างได้ — ระบบ gen รหัสอ้างอิง `V`+เลข 12 หลักให้ สำหรับบุคคลสำคัญ/VVIP), `first_name`, `last_name`, `photo` | ลงทะเบียนสมาชิกถาวร → สถานะ `pending` |
 | GET | `/v2/external/permanent/` | `?status=pending\|active\|revoked` | list สมาชิกถาวร |

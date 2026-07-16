@@ -29,6 +29,8 @@ token ใน `/root/.git-credentials` (WSL) หมดอายุ/ถูก revo
 ## บันทึกงานที่ทำ (changelog)
 
 ### 2026-07-16
+- ✅ **deploy prod (`deploy.ps1`) + เทส prod ผ่าน** — issue ไม่บังคับ citizen_id ทำงานถูกต้องบน production (ไม่มี migration)
+- ✅ **ทีมประตูเทส QR จริงผ่านแล้วทั้ง 2 แบบ (รายวัน + ถาวร)** ผ่าน `/v2/external/check/` — QR ออกสมบูรณ์ สแกนเข้าประตูได้จริง ปิดงาน external access **ครบวงจร** (task ค้างตั้งแต่ 2026-07-12)
 - ✅ `/v2/external/issue/` (เส้นรายวัน) — ทำ `citizen_id` เป็น **optional** (เดิมบังคับ ผ่าน `is_valid_thai_citizen_id`) mirror pattern เดียวกับ `permanent_register`: ไม่ส่งเลขบัตร → `_gen_external_ref_id()` gen `V`+12 หลัก แล้วออกรหัสรายวันได้ · บังคับแค่ `first_name`+`last_name` · [views_v2.py](apiapp/views_v2.py) `issue()` + เทส `DailyPoolAccessCodeTests` เพิ่ม 2 เคส (gen ref-id + gate allow, และ anonymous ไม่ dedupe/กินสล็อตทุกครั้ง) — api tests 22/22 ผ่าน · **trade-off:** ไม่มีเลขบัตร = แยกคนไม่ได้ → บล็อก/โควตา/dedupe ต่อคนใช้ไม่ได้ และกินสล็อต pool (default 100/วัน ขยายด้วย `seed_access_codes --count N`) ทุกครั้ง — จับคู่กับงานฝั่ง reserv วันเดียวกัน · ยังไม่ push/deploy
 
 ### 2026-07-13

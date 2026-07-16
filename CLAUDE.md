@@ -8,9 +8,11 @@ deploy_os: Windows Server
 deploy_method: IIS + wfastcgi — deploy ผ่าน deploy.ps1 (git pull→migrate→collectstatic→recycle app pool)
 deploy_path: C:\inetpub\wwwroot\NPUAPI\apiproject
 deploy_db: MySQL (โฮสต์ reserv_db ของโปรเจกต์ reserv ด้วย)
-progress: 88
-phase: API หลักใช้งาน production จริง · external member integration เสร็จ+prod verified · secret (Walai+HA token) ย้ายเข้า .env แล้ว prod verified · งานล่าสุด (issue ไม่บังคับ citizen_id) push แล้ว รอ deploy prod — เหลือรอทีมประตูเทส QR + งานศึกษา security/API mgmt
+progress: 90
+phase: API หลักใช้งาน production จริง · external access ปิดครบวงจร (issue ไม่บังคับ citizen_id deploy+prod verified + ทีมประตูเทส QR ผ่านทั้งรายวันและถาวร) · secret ย้ายเข้า .env แล้ว — เหลืองานขยาย test coverage + ศึกษา security/API mgmt
 done_2026-07-16:
+  - ✅ deploy prod (`deploy.ps1`) + เทส prod ผ่าน — issue ไม่บังคับ citizen_id ทำงานถูกต้องบน production
+  - ✅ **ทีมประตูเทส QR จริงผ่านแล้วทั้ง 2 แบบ (รายวัน + ถาวร)** ผ่าน `/v2/external/check/` — ปิดงาน external access ครบวงจร (task ค้างตั้งแต่ 2026-07-12)
   - ✅ `/v2/external/issue/` ทำ `citizen_id` เป็น optional (บังคับแค่ first_name+last_name) — ไม่ส่งเลขบัตร → `_gen_external_ref_id()` gen `V`+12 หลัก (mirror permanent_register), เทสเพิ่ม 2 เคส รวม 22/22 ผ่าน, อัปเดต API_ENDPOINTS.md — push แล้ว (`2ad5701`) จับคู่งานฝั่ง reserv (`336d4e2`)
 done_2026-07-13:
   - ✅ ทำความสะอาดไฟล์ untracked สำเนา/backup 7 ไฟล์ (ไฟล์เก่าปี 2024/ต้นปี 2025 ไม่ตรงโค้ดปัจจุบัน)
@@ -26,8 +28,6 @@ done_2026-07-09:
   - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
   - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
 next:
-  - deploy prod งาน issue ไม่บังคับ citizen_id (`deploy.ps1`) — **ต้อง deploy ก่อน reserv** เพราะ reserv พึ่ง endpoint นี้; ไม่มี migration; ถ้า pool ไม่พอค่อย `python manage.py seed_access_codes --count N`
-  - แจ้งทีมประตูให้เอา QR code ไปทดสอบว่าเข้าได้จริงหรือไม่ (route `/v2/external/check/` พร้อมแล้วฝั่ง API + ส่งเอกสารคู่มือแล้ว, รอทีมประตูเพิ่ม route 10 หลักและทดสอบกับเครื่องสแกนจริง)
   - ขยาย test coverage endpoint กลุ่มที่ต่อระบบภายนอก (LDAP/Walai/MikroTik/Sonoff) — ต้อง mock (ปัจจุบันคุมแค่ external member ทั้ง permanent + daily)
   - ทำความสะอาดไฟล์ backup local ที่มี secret ตกค้าง (code_deploy/, settings27062025.py — gitignore อยู่ ไม่หลุด repo แต่ยังมี token เก่าในเครื่อง)
   - ศึกษา security ที่ต้องทำสำหรับ API นี้ (เช่น auth/rate-limit/input validation/HTTPS — ยังไม่ได้กำหนดขอบเขต) — รับแจ้ง 2026-07-12

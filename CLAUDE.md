@@ -2,8 +2,16 @@
 name: apiproject (NPU API Backend)
 status: active
 deployment: production
+deploy_url: https://api.npu.ac.th
+deploy_server: 202.29.55.217
+deploy_os: Windows Server
+deploy_method: IIS + wfastcgi — deploy ผ่าน deploy.ps1 (git pull→migrate→collectstatic→recycle app pool)
+deploy_path: C:\inetpub\wwwroot\NPUAPI\apiproject
+deploy_db: MySQL (โฮสต์ reserv_db ของโปรเจกต์ reserv ด้วย)
 progress: 88
-phase: API หลักใช้งาน production จริง · external member integration เสร็จ+prod verified · secret (Walai+HA token) ย้ายเข้า .env แล้ว prod verified · เริ่มลง test coverage เส้น external — เหลือรอทีมประตูเทส QR + งานศึกษา security/API mgmt
+phase: API หลักใช้งาน production จริง · external member integration เสร็จ+prod verified · secret (Walai+HA token) ย้ายเข้า .env แล้ว prod verified · งานล่าสุด (issue ไม่บังคับ citizen_id) push แล้ว รอ deploy prod — เหลือรอทีมประตูเทส QR + งานศึกษา security/API mgmt
+done_2026-07-16:
+  - ✅ `/v2/external/issue/` ทำ `citizen_id` เป็น optional (บังคับแค่ first_name+last_name) — ไม่ส่งเลขบัตร → `_gen_external_ref_id()` gen `V`+12 หลัก (mirror permanent_register), เทสเพิ่ม 2 เคส รวม 22/22 ผ่าน, อัปเดต API_ENDPOINTS.md — push แล้ว (`2ad5701`) จับคู่งานฝั่ง reserv (`336d4e2`)
 done_2026-07-13:
   - ✅ ทำความสะอาดไฟล์ untracked สำเนา/backup 7 ไฟล์ (ไฟล์เก่าปี 2024/ต้นปี 2025 ไม่ตรงโค้ดปัจจุบัน)
   - ✅ ส่งมอบเอกสาร Word คู่มือ API ให้ทีมประตู (doc/คู่มือทีมประตู-external-check-api.docx — untracked) + ทดสอบยิง /v2/external/check/ บน prod ผ่าน (permanent VVIP รหัส V… allow:true)
@@ -18,6 +26,7 @@ done_2026-07-09:
   - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
   - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
 next:
+  - deploy prod งาน issue ไม่บังคับ citizen_id (`deploy.ps1`) — **ต้อง deploy ก่อน reserv** เพราะ reserv พึ่ง endpoint นี้; ไม่มี migration; ถ้า pool ไม่พอค่อย `python manage.py seed_access_codes --count N`
   - แจ้งทีมประตูให้เอา QR code ไปทดสอบว่าเข้าได้จริงหรือไม่ (route `/v2/external/check/` พร้อมแล้วฝั่ง API + ส่งเอกสารคู่มือแล้ว, รอทีมประตูเพิ่ม route 10 หลักและทดสอบกับเครื่องสแกนจริง)
   - ขยาย test coverage endpoint กลุ่มที่ต่อระบบภายนอก (LDAP/Walai/MikroTik/Sonoff) — ต้อง mock (ปัจจุบันคุมแค่ external member ทั้ง permanent + daily)
   - ทำความสะอาดไฟล์ backup local ที่มี secret ตกค้าง (code_deploy/, settings27062025.py — gitignore อยู่ ไม่หลุด repo แต่ยังมี token เก่าในเครื่อง)
@@ -25,7 +34,8 @@ next:
   - ศึกษาการบริหารจัดการ API ในภาพรวม (API management/versioning/monitoring/gateway ฯลฯ) — รับแจ้ง 2026-07-12
 risks:
   - secret เคย hardcode ใน settings.py (Walai+HA token) — ย้ายเข้า .env แล้ว 2026-07-13; เหลือสำเนา token เก่าในไฟล์ backup local (gitignore)
-updated: 2026-07-13
+  - `/v2/external/issue/` ไม่บังคับ citizen_id → ระงับสิทธิ์/โควตารายคนใช้ไม่ได้ + pool 100 รหัส/วันอาจหมดเร็ว (ดู MEM.md — มีแผนถอย)
+updated: 2026-07-16
 -->
 
 # CLAUDE.md

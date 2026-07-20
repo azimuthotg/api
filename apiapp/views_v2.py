@@ -4,7 +4,7 @@ from apiapp.models import UserProfile, StudentsInfo, StaffInfo, ExternalMember, 
 from apiapp.serializers_v2 import UserProfileSerializerV2, StudentsInfoSerializerV2, StaffInfoSerializerV2, ExternalMemberSerializerV2
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from ldap3 import Server, Connection, ALL, NTLM
 from rest_framework.decorators import action
 from django.http import FileResponse
@@ -560,6 +560,33 @@ class ExternalAccessViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.V
             member.approved_by = approved_by or getattr(request.user, 'username', None)
             member.save(update_fields=['permanent_code', 'status', 'approved_at', 'approved_by'])
 
+        return Response({'success': True, 'member': ExternalMemberSerializerV2(member).data}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9V][0-9]{12})/update',
+            parser_classes=[MultiPartParser, FormParser, JSONParser])
+    def permanent_update(self, request, citizen_id=None):
+        """admin แก้ไขชื่อ-สกุลสมาชิกถาวร (ไม่แตะสถานะ/รหัสถาวร; แนบ photo มาด้วยก็เปลี่ยนรูปให้)"""
+        member = ExternalMember.objects.filter(
+            citizen_id=citizen_id, member_type=ExternalMember.TYPE_PERMANENT
+        ).first()
+        if member is None:
+            return Response({'success': False, 'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        first_name = (request.data.get('first_name') or '').strip()
+        last_name = (request.data.get('last_name') or '').strip()
+        if not first_name or not last_name:
+            return Response({'success': False, 'detail': 'Missing first_name or last_name'}, status=status.HTTP_400_BAD_REQUEST)
+
+        member.first_name = first_name
+        member.last_name = last_name
+        update_fields = ['first_name', 'last_name']
+        photo = request.FILES.get('photo') if hasattr(request, 'FILES') else None
+        if photo:
+            if member.photo:
+                member.photo.delete(save=False)  # ลบรูปเดิมทิ้ง ไม่ให้ไฟล์ค้าง
+            member.photo = photo
+            update_fields.append('photo')
+        member.save(update_fields=update_fields)
         return Response({'success': True, 'member': ExternalMemberSerializerV2(member).data}, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path='permanent/(?P<citizen_id>[0-9V][0-9]{12})/revoke')

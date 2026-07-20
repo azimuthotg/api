@@ -115,6 +115,7 @@
 | GET | `/v2/external/permanent/` | `?status=pending\|active\|revoked` | list สมาชิกถาวร |
 | GET | `/v2/external/permanent/{citizen_id}/` | — | รายละเอียดสมาชิกถาวร (`citizen_id` รวมรหัสอ้างอิง `V…`) |
 | POST | `/v2/external/permanent/{citizen_id}/approve/` | — | อนุมัติ → ออก `permanent_code` (คงที่) + `active` |
+| POST | `/v2/external/permanent/{citizen_id}/update/` | `first_name`, `last_name` (บังคับ), `photo` (ไม่บังคับ — multipart) | แก้ไขชื่อ-สกุล (และรูปถ้าแนบมา) ไม่แตะสถานะ/`permanent_code` |
 | POST | `/v2/external/permanent/{citizen_id}/revoke/` | — | ระงับ → รหัสใช้ไม่ได้ทันที |
 | GET | `/v2/external/permanent/{citizen_id}/photo/` | — | รูปสมาชิก (JWT — ไม่เปิดสาธารณะ) |
 

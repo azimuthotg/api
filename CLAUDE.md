@@ -9,7 +9,9 @@ deploy_method: IIS + wfastcgi — deploy ผ่าน deploy.ps1 (git pull→mig
 deploy_path: C:\inetpub\wwwroot\NPUAPI\apiproject
 deploy_db: MySQL (โฮสต์ reserv_db ของโปรเจกต์ reserv ด้วย)
 progress: 90
-phase: API หลักใช้งาน production จริง · external access ปิดครบวงจร (issue ไม่บังคับ citizen_id deploy+prod verified + ทีมประตูเทส QR ผ่านทั้งรายวันและถาวร) · secret ย้ายเข้า .env แล้ว — เหลืองานขยาย test coverage + ศึกษา security/API mgmt
+phase: API หลักใช้งาน production จริง · external access ปิดครบวงจร (issue/permanent + แก้ไขชื่อ-สกุลสมาชิกถาวร deploy+prod verified + ทีมประตูเทส QR ผ่านทั้งรายวันและถาวร) · secret ย้ายเข้า .env แล้ว — เหลืองานขยาย test coverage + ศึกษา security/API mgmt
+done_2026-07-20:
+  - ✅ `/v2/external/permanent/{citizen_id}/update/` แก้ไขชื่อ-สกุล (+รูป) สมาชิกถาวร — ไม่แตะ status/permanent_code/approved_* · push `e14897d` · deploy prod + เทสร่วมกับ reserv ผ่าน (แก้ชื่อได้จริง รหัสถาวรไม่เปลี่ยน)
 done_2026-07-16:
   - ✅ deploy prod (`deploy.ps1`) + เทส prod ผ่าน — issue ไม่บังคับ citizen_id ทำงานถูกต้องบน production
   - ✅ **ทีมประตูเทส QR จริงผ่านแล้วทั้ง 2 แบบ (รายวัน + ถาวร)** ผ่าน `/v2/external/check/` — ปิดงาน external access ครบวงจร (task ค้างตั้งแต่ 2026-07-12)
@@ -28,6 +30,7 @@ done_2026-07-09:
   - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
   - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
 next:
+  - เพิ่ม test ให้ `permanent/{id}/update/` (deploy+เทสมือผ่านแล้ว แต่ยังไม่มีเคสใน apiapp/tests.py — เคสสำคัญ: แก้ชื่อคน active แล้ว status/permanent_code ต้องไม่เปลี่ยน)
   - ขยาย test coverage endpoint กลุ่มที่ต่อระบบภายนอก (LDAP/Walai/MikroTik/Sonoff) — ต้อง mock (ปัจจุบันคุมแค่ external member ทั้ง permanent + daily)
   - ทำความสะอาดไฟล์ backup local ที่มี secret ตกค้าง (code_deploy/, settings27062025.py — gitignore อยู่ ไม่หลุด repo แต่ยังมี token เก่าในเครื่อง)
   - ศึกษา security ที่ต้องทำสำหรับ API นี้ (เช่น auth/rate-limit/input validation/HTTPS — ยังไม่ได้กำหนดขอบเขต) — รับแจ้ง 2026-07-12
@@ -35,7 +38,7 @@ next:
 risks:
   - secret เคย hardcode ใน settings.py (Walai+HA token) — ย้ายเข้า .env แล้ว 2026-07-13; เหลือสำเนา token เก่าในไฟล์ backup local (gitignore)
   - `/v2/external/issue/` ไม่บังคับ citizen_id → ระงับสิทธิ์/โควตารายคนใช้ไม่ได้ + pool 100 รหัส/วันอาจหมดเร็ว (ดู MEM.md — มีแผนถอย)
-updated: 2026-07-16
+updated: 2026-07-20
 -->
 
 # CLAUDE.md

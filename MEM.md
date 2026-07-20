@@ -11,6 +11,13 @@ token ใน `/root/.git-credentials` (WSL) หมดอายุ/ถูก revo
 
 ## การตัดสินใจ
 
+### 2026-07-20 — แก้ไขชื่อสมาชิกถาวร ต้องมี endpoint `update/` แยก ใช้ `register/` ซ้ำไม่ได้
+ตอนแรกดูเหมือนใช้ `permanent/register/` ยิงทับด้วย citizen_id เดิมก็พอ แต่ `register/` ตั้งใจออกแบบให้เป็น "ลงทะเบียนใหม่" คือ **บังคับ `status = pending` เสมอ** และถ้าคนนั้นเป็น permanent ที่ `active` อยู่แล้วจะตอบ **409 ปฏิเสธไปเลย** (กันเผลอถอนสิทธิ์คนที่อนุมัติแล้ว)
+→ ถ้าดันใช้ทางนั้นแก้ชื่อ จะกลายเป็นว่าคนที่อนุมัติแล้ว **แก้ชื่อไม่ได้เลย** (ติด 409) ส่วนคนที่ยัง pending ก็เสี่ยงโดนรีเซ็ตสถานะ
+ตัดสินใจ: เพิ่ม `POST /v2/external/permanent/{citizen_id}/update/` แยก — แตะเฉพาะ `first_name`/`last_name` (+`photo` ถ้าแนบมา, ลบไฟล์รูปเดิมทิ้ง) และ **ไม่แตะ `status`/`permanent_code`/`approved_at`/`approved_by`** → แก้ชื่อคนที่ถือบัตรอยู่ได้โดยรหัสถาวรเดิมยังสแกนผ่าน ไม่ต้องอนุมัติใหม่/ออกบัตรใหม่
+ฝั่ง reserv เป็นหน้า `/manage/external/<id>/edit/` proxy มาที่ endpoint นี้ (reserv ไม่เก็บข้อมูลสมาชิกเอง — api เป็น source of truth)
+deploy prod ทั้ง 2 repo + เทสจริงผ่านแล้ว
+
 ### 2026-07-13 — ย้าย secret ที่ hardcode เป็น default ใน settings.py ไป .env
 เดิม `settings.py` มี pattern `X = env('X', default='<ค่าจริง>')` ซึ่งทำให้ **token production หลุดอยู่ในโค้ดที่ commit** (Walai token บรรทัด 212, HA_TOKEN บรรทัด 209 — long-lived อายุถึง ~2034)
 ตัดสินใจ: เปลี่ยน default เป็น `''` แล้วให้ค่าจริงมาจาก `.env` เท่านั้น (`.env` gitignore อยู่แล้ว)
@@ -27,6 +34,11 @@ token ใน `/root/.git-credentials` (WSL) หมดอายุ/ถูก revo
 **ทางแก้:** ใช้ Postman **Desktop app** (หรือ Desktop Agent) บนเครื่องที่เข้าเน็ต npu ได้ → ยิงถึงจริง ได้ JSON ถูกต้อง
 
 ## บันทึกงานที่ทำ (changelog)
+
+### 2026-07-20
+- ✅ **`POST /v2/external/permanent/{citizen_id}/update/`** — แก้ไขชื่อ-สกุลสมาชิกถาวร ([views_v2.py](apiapp/views_v2.py) `permanent_update()`): บังคับ `first_name`+`last_name` (ว่าง → 400), แนบ `photo` ได้ (multipart → เปลี่ยนรูป + ลบไฟล์เดิม), รับทั้ง JSON และ form-data, ไม่เจอ/ไม่ใช่ permanent → 404 · ไม่มี migration (ไม่แตะ model) · อัปเดต API_ENDPOINTS.md · push `e14897d` → origin/main
+- ✅ deploy prod ทั้ง 2 repo + เทสจริงผ่าน — แก้ชื่อ-นามสกุลบุคคลภายนอกถาวรได้ ระบบทำงานร่วมกับ reserv ปกติ
+- ⚠️ **ยังไม่มี automated test** ของ endpoint นี้ (ผ่านแค่ `manage.py check` + เทสมือบน prod) — เป็น task ใน `next:`
 
 ### 2026-07-16
 - ✅ **deploy prod (`deploy.ps1`) + เทส prod ผ่าน** — issue ไม่บังคับ citizen_id ทำงานถูกต้องบน production (ไม่มี migration)

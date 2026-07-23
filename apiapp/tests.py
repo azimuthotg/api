@@ -1,13 +1,16 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import resolve
 from rest_framework.request import Request
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.test import APIRequestFactory
 
-from .models import ExternalMember, ExternalAccessCode
+from .models import ExternalMember, ExternalAccessCode, StaffInfo, StudentsInfo
+from .serializer import StaffInfoSerializer, StudentsInfoSerializer
+from .serializers_v2 import (StaffInfoFullSerializerV2, StaffInfoSerializerV2,
+                             StudentsInfoSerializerV2)
 from .views_v2 import ExternalAccessViewSetV2, _bkk_today
 
 
@@ -278,3 +281,57 @@ class DailyPoolAccessCodeTests(TestCase):
         resp = _call_check(issue.data['access_code'], self.jwt_user)
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(resp.data['allow'])
+
+
+class StaffSerializerFieldTests(SimpleTestCase):
+    """คุมว่าข้อมูลบุคลากรออกไปทางไหนได้บ้าง
+
+    StudentsInfo/StaffInfo เป็น managed=False → ตารางไม่ถูกสร้างตอนเทส จึงเทสที่ระดับ
+    serializer ด้วย instance ในหน่วยความจำ (การ serialize ไม่แตะ DB) ซึ่งเป็นจุดที่คุมจริง
+    เพราะทั้ง ViewSet และ auth_and_get_personnel ใช้ serializer เหล่านี้ร่วมกัน
+    """
+
+    def setUp(self):
+        self.staff = StaffInfo(
+            staffid='S001', staffcitizenid='1234567890123',
+            prefixfullname='นาย', staffname='สมชาย', staffsurname='ใจดี',
+            staffbirthdate=date(1980, 5, 17), gendernameth='ชาย',
+            posnameth='นักวิชาการคอมพิวเตอร์', stftypename='ข้าราชการ',
+            substftypename='สายสนับสนุน', stfstaname='ปฏิบัติงาน',
+            departmentname='สำนักวิทยบริการ',
+        )
+
+    def test_v1_lookup_hides_birthdate_and_gender(self):
+        # /staff-info/{id}/ — แค่รู้เลขบัตรก็ขอได้ ต้องไม่ได้วันเกิด/เพศ
+        data = StaffInfoSerializer(self.staff).data
+        self.assertNotIn('staffbirthdate', data)
+        self.assertNotIn('gendernameth', data)
+        self.assertEqual(data['staffname'], 'สมชาย')
+        self.assertEqual(data['departmentname'], 'สำนักวิทยบริการ')
+
+    def test_v2_lookup_hides_birthdate_and_gender(self):
+        # /v2/staff/{id}/ — เหมือน v1 แต่มี fullname เพิ่ม
+        data = StaffInfoSerializerV2(self.staff).data
+        self.assertNotIn('staffbirthdate', data)
+        self.assertNotIn('gendernameth', data)
+        self.assertEqual(data['fullname'], 'นาย สมชาย ใจดี')
+
+    def test_authenticated_personnel_keeps_birthdate(self):
+        # auth_and_get_personnel — เจ้าตัวล็อกอินเอง = ข้อมูลของตัวเอง
+        # emoney ใช้ staffbirthdate จากทางนี้ ถ้าเคสนี้แดงแปลว่ากำลังจะทำ emoney พัง
+        data = StaffInfoFullSerializerV2(self.staff).data
+        self.assertEqual(data['staffbirthdate'], '1980-05-17')
+        self.assertEqual(data['gendernameth'], 'ชาย')
+
+    def test_full_serializer_is_superset_of_lookup(self):
+        lookup = set(StaffInfoSerializerV2(self.staff).data)
+        full = set(StaffInfoFullSerializerV2(self.staff).data)
+        self.assertTrue(lookup.issubset(full))
+        self.assertEqual(full - lookup, {'staffbirthdate', 'gendernameth'})
+
+    def test_student_serializers_never_expose_apassword(self):
+        # กันถอยหลังงาน 2026-07-23: apassword คือรหัสผ่าน plaintext ห้ามหลุดออกทุกทาง
+        student = StudentsInfo(student_code='693010210146', prefix_name='นาย',
+                               student_name='สมหญิง', student_surname='รักเรียน')
+        self.assertNotIn('apassword', StudentsInfoSerializer(student).data)
+        self.assertNotIn('apassword', StudentsInfoSerializerV2(student).data)

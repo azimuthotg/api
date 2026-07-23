@@ -1,7 +1,7 @@
 # apiapp/views_v2.py
 from librouteros import connect
 from apiapp.models import UserProfile, StudentsInfo, StaffInfo, ExternalMember, ExternalAccessCode
-from apiapp.serializers_v2 import UserProfileSerializerV2, StudentsInfoSerializerV2, StaffInfoSerializerV2, ExternalMemberSerializerV2
+from apiapp.serializers_v2 import UserProfileSerializerV2, StudentsInfoSerializerV2, StaffInfoSerializerV2, StaffInfoFullSerializerV2, ExternalMemberSerializerV2
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
@@ -285,7 +285,9 @@ class LDAPAuthViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ViewSet
             try:
                 # ค้นหาข้อมูลบุคลากรตาม userLdap (จุดนี้อาจต้องปรับตามโครงสร้างข้อมูลจริง)
                 staff_info = StaffInfo.objects.get(staffcitizenid=user_ldap)
-                serializer = StaffInfoSerializerV2(staff_info)
+                # เจ้าตัวเพิ่งยืนยันตัวตนกับ AD ด้วยรหัสผ่านของตัวเอง = ข้อมูลของตัวเอง
+                # จึงใช้ตัวเต็ม (มี staffbirthdate ที่ emoney ใช้) ต่างจาก /v2/staff/{id}/
+                serializer = StaffInfoFullSerializerV2(staff_info)
                 
                 # API v2: เพิ่มข้อมูลแผนกและตำแหน่ง
                 department = staff_info.departmentname

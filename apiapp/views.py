@@ -12,6 +12,7 @@ from django.conf import settings  # เพิ่มบรรทัดนี้
 from django.http import HttpResponse
 from apiapp.monitoring import check_ad_detailed, log_binding, BindLoggingCreateMixin
 from apiapp.access_log import ApiAccessLogMixin
+from apiapp.authentication import NoListMixin
 
 
 
@@ -34,13 +35,13 @@ class userViewset(BindLoggingCreateMixin, viewsets.ModelViewSet):
 
 # อ่านอย่างเดียว — managed=False กันแค่ migration ไม่ได้กันการเขียนของ ORM
 # และ endpoint นี้ไม่มี auth จึงต้องปิด POST/PUT/PATCH/DELETE ที่ ViewSet
-class StudentsInfoViewset(ApiAccessLogMixin, viewsets.ReadOnlyModelViewSet):
+class StudentsInfoViewset(ApiAccessLogMixin, NoListMixin, viewsets.ReadOnlyModelViewSet):
     queryset = StudentsInfo.objects.all()
     serializer_class = StudentsInfoSerializer
     lookup_field = 'student_code'
     access_log_api_version = 'v1'
 
-class StaffInfoViewSet(ApiAccessLogMixin, viewsets.ReadOnlyModelViewSet):
+class StaffInfoViewSet(ApiAccessLogMixin, NoListMixin, viewsets.ReadOnlyModelViewSet):
     queryset = StaffInfo.objects.all()
     serializer_class = StaffInfoSerializer
     lookup_field = 'staffcitizenid'

@@ -20,7 +20,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import AllowAny
 
 # นำเข้า Authentication Mixins
-from apiapp.authentication import JWTV2Authentication, PublicEndpointAuthentication
+from apiapp.authentication import JWTV2Authentication, PublicEndpointAuthentication, NoListMixin
 from apiapp.monitoring import check_ad_detailed, log_binding, BindLoggingCreateMixin
 from apiapp.access_log import ApiAccessLogMixin
 from apiapp.thai_id import is_valid_thai_citizen_id
@@ -70,7 +70,7 @@ class UserViewSetV2(BindLoggingCreateMixin, JWTV2Authentication, viewsets.ModelV
     # - pagination ที่ปรับแต่งได้
     # - การค้นหาขั้นสูง
 
-class StudentsInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ReadOnlyModelViewSet):
+class StudentsInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, NoListMixin, viewsets.ReadOnlyModelViewSet):
     queryset = StudentsInfo.objects.all()
     serializer_class = StudentsInfoSerializerV2
     lookup_field = 'student_code'
@@ -89,7 +89,7 @@ class StudentsInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.Rea
             
         return queryset
 
-class StaffInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ReadOnlyModelViewSet):
+class StaffInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, NoListMixin, viewsets.ReadOnlyModelViewSet):
     queryset = StaffInfo.objects.all()
     serializer_class = StaffInfoSerializerV2
     lookup_field = 'staffcitizenid'

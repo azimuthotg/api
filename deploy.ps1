@@ -27,14 +27,23 @@ if ($dirty) {
     exit 1
 }
 
-# Record the currently-running commit so rollback.ps1 can return to it instantly.
+# Remember the currently-running commit as the rollback target. Written only
+# AFTER the pull and only when HEAD actually moved — a repeated no-op deploy
+# would otherwise overwrite it with the current commit and silently destroy
+# the way back.
 $before = (git rev-parse HEAD).Trim()
-$before | Out-File -FilePath ".deploy-last-good" -Encoding ascii -NoNewline
 Write-Host "==> commit ที่รันอยู่ก่อน deploy: $before" -ForegroundColor Cyan
-Write-Host "    ถ้า deploy แล้วมีปัญหา ย้อนกลับทันทีด้วย: .\rollback.ps1" -ForegroundColor Cyan
 
 Write-Host "==> Pulling latest code from origin/main..." -ForegroundColor Cyan
 git pull origin main
+
+$after = (git rev-parse HEAD).Trim()
+if ($after -eq $before) {
+    Write-Host "==> ไม่มี commit ใหม่ — คง .deploy-last-good เดิมไว้ (ไม่เขียนทับ)" -ForegroundColor Yellow
+} else {
+    $before | Out-File -FilePath ".deploy-last-good" -Encoding ascii -NoNewline
+    Write-Host "==> บันทึกจุดย้อนกลับไว้แล้ว: $before" -ForegroundColor Cyan
+}
 
 Write-Host "==> Applying database migrations..." -ForegroundColor Cyan
 & $Python manage.py migrate --noinput
@@ -58,3 +67,13 @@ try {
 
 Write-Host "==> Deploy complete." -ForegroundColor Green
 git log -1 --oneline
+
+# บอกให้ชัดว่าถ้าย้อนกลับตอนนี้จะไปโผล่ที่ commit ไหน
+Write-Host ""
+if (Test-Path ".deploy-last-good") {
+    $lastGood = (Get-Content ".deploy-last-good" -Raw).Trim()
+    Write-Host "==> ถ้าต้องย้อนกลับ ใช้ .\rollback.ps1 — จะย้อนไปที่:" -ForegroundColor Cyan
+    git log -1 --oneline $lastGood
+} else {
+    Write-Host "==> ยังไม่มี .deploy-last-good — ถ้าต้องย้อนกลับต้องระบุเอง: .\rollback.ps1 -To <sha>" -ForegroundColor Yellow
+}

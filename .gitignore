@@ -50,3 +50,7 @@ apiproject/settings27062025.py
 
 # Deployment copies & dated backups (not source of truth — git history is)
 code_deploy/
+
+# Deploy/rollback bookkeeping (สร้างบนเครื่อง prod เท่านั้น)
+.deploy-last-good
+.rollback-from

@@ -1,4 +1,4 @@
-# deploy.ps1 — Git-based deployment for the NPU API (IIS + wfastcgi)
+﻿# deploy.ps1 — Git-based deployment for the NPU API (IIS + wfastcgi)
 #
 # Run this ON THE PRODUCTION SERVER from the project root:
 #   cd C:\inetpub\wwwroot\NPUAPI\apiproject
@@ -27,6 +27,12 @@ if ($dirty) {
     exit 1
 }
 
+# Record the currently-running commit so rollback.ps1 can return to it instantly.
+$before = (git rev-parse HEAD).Trim()
+$before | Out-File -FilePath ".deploy-last-good" -Encoding ascii -NoNewline
+Write-Host "==> commit ที่รันอยู่ก่อน deploy: $before" -ForegroundColor Cyan
+Write-Host "    ถ้า deploy แล้วมีปัญหา ย้อนกลับทันทีด้วย: .\rollback.ps1" -ForegroundColor Cyan
+
 Write-Host "==> Pulling latest code from origin/main..." -ForegroundColor Cyan
 git pull origin main
 
@@ -39,6 +45,16 @@ Write-Host "==> Collecting static files..." -ForegroundColor Cyan
 Write-Host "==> Recycling IIS app pool '$AppPool'..." -ForegroundColor Cyan
 Import-Module WebAdministration
 Restart-WebAppPool -Name $AppPool
+
+# Smoke check — non-fatal: บอกให้รู้เร็วที่สุดว่าควรย้อนกลับไหม
+Write-Host "==> Smoke check /health/ ..." -ForegroundColor Cyan
+try {
+    $r = Invoke-WebRequest -Uri "https://api.npu.ac.th/health/" -UseBasicParsing -TimeoutSec 20
+    Write-Host "    HTTP $($r.StatusCode) — $($r.Content)" -ForegroundColor Green
+} catch {
+    Write-Host "    เรียก /health/ ไม่สำเร็จ: $($_.Exception.Message)" -ForegroundColor Yellow
+    Write-Host "    ตรวจด้วยมืออีกครั้ง ถ้าระบบใช้งานไม่ได้ให้รัน .\rollback.ps1 ทันที" -ForegroundColor Yellow
+}
 
 Write-Host "==> Deploy complete." -ForegroundColor Green
 git log -1 --oneline

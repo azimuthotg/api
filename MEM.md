@@ -23,6 +23,12 @@ serializer ทั้ง v1/v2 ใช้ `fields = '__all__'` → รั่วอ
 token ใน `/root/.git-credentials` (WSL) หมดอายุ/ถูก revoke — GitHub ตอบ "Invalid username or token"
 ทางแก้: push จากฝั่ง Windows (`C:\projects\apiproject`) ที่ใช้ Git Credential Manager แยกกัน แทนการสร้าง PAT ใหม่
 
+### 2026-07-23 — ผู้เรียก v1 แบบไม่มี auth คือ reserv เอง (ไม่ใช่ระบบภายนอกที่คุมไม่ได้)
+ความเสี่ยง "`/std-info/`,`/staff-info/` v1 ไม่ต้อง auth" ค้างมานานเพราะไม่รู้ว่าใครใช้ เลยไม่กล้าปิด
+วิธีที่ระบุตัวได้ (ทำซ้ำได้): เทียบ log 2 หน้าที่มีอยู่แล้ว — `/monitor/api-usage/` เห็น `LDAPAuthViewSet.auth_ldap` (110.78.83.102) แล้ว `StudentsInfoViewset.retrieve` (10.0.6.253) ยิงติดกันใน 3 วินาที **ด้วยรหัส นศ. เดียวกัน** แล้วเอารหัสนั้นไปเทียบหน้า `/monitor/` เห็นเป็นขั้นตอนผูกบัญชี LINE พอดี → ยืนยันด้วยโค้ด `reserv/booking/views.py` `_fetch_npu_profile()` ที่ `requests.get()` เปล่า ๆ ไม่แนบ header
+**ทางแก้ที่เปิดอยู่:** reserv มี `NPU_API_USERNAME/PASSWORD` + cache token อยู่แล้ว (settings.py, ใช้ยิง `/v2/external/*` ทุกวัน) แค่ย้าย `_fetch_npu_profile()` ไป `/v2/student/`,`/v2/staff/` พร้อม Bearer แล้วค่อยปิด v1
+**บทเรียน:** IP + ลำดับเวลา + target_user ใน access log ระบุตัวระบบผู้เรียกได้แม้ไม่มี JWT — ไม่ต้องเดาว่า "อาจมีใครใช้อยู่"
+
 ## การตัดสินใจ
 
 ### 2026-07-23 — ยืนยันว่าถอด `apassword` ได้ปลอดภัย ด้วยข้อมูลจาก api_access_log ไม่ใช่การเดา

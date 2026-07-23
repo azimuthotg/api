@@ -37,6 +37,7 @@ done_2026-07-09:
   - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
   - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
 next:
+  - ย้าย reserv `_fetch_npu_profile()` จาก v1 (`/std-info/`,`/staff-info/` ไม่ต้อง auth) ไปเรียก v2 + Bearer token แล้วปิด v1 retrieve ให้ต้อง auth — reserv มีบัญชี JWT + cache token พร้อมใช้อยู่แล้ว (แตะ 2 repo, deploy พร้อมกัน · ดู MEM.md)
   - เฝ้าดู `/monitor/api-usage/` ถึงราว 2026-07-26 ว่า emoney / courses / pfss (เรียกไม่บ่อย ยังไม่ได้ผ่านโค้ดใหม่) ทำงานปกติหลังถอด apassword
   - ตัดต้นทาง apassword — แก้ `aims_project/dashboard/management/commands/sync_students.py` เลิกดึงคอลัมน์ APASSWORD จาก Oracle แล้ว `ALTER TABLE students_info DROP COLUMN apassword` (ทำหลัง 2026-07-30 ให้ของใหม่นิ่งก่อน · สำรองตารางก่อนเสมอ)
   - พิจารณาถอด `staffbirthdate` ออกจาก StaffInfoSerializer (ยังใช้ `'__all__'` อยู่ → ส่งวันเกิดออกไปโดยไม่จำเป็น)
@@ -48,7 +49,7 @@ next:
   - ศึกษาการบริหารจัดการ API ในภาพรวม (API management/versioning/monitoring/gateway ฯลฯ) — รับแจ้ง 2026-07-12
 risks:
   - `students_info.apassword` ยังเก็บรหัสผ่าน plaintext ไว้ใน DB (10,789 แถว) — ปิดทาง API แล้ว แต่ยังไม่ตัดต้นทาง/drop คอลัมน์ (ดู MEM.md)
-  - `/std-info/`,`/staff-info/` (v1) ยังไม่ต้อง auth — ใครรู้รหัส นศ./เลขบัตร ยิงดูชื่อ-คณะ-สาขาได้ (ปิด list + สิทธิ์เขียนแล้ว เหลือ retrieve)
+  - `/std-info/`,`/staff-info/` (v1) ยังไม่ต้อง auth — ใครรู้รหัส นศ./เลขบัตร ยิงดูชื่อ-คณะ-สาขาได้ (ปิด list + สิทธิ์เขียนแล้ว เหลือ retrieve) · **ระบุตัวผู้เรียกได้แล้ว 2026-07-23 = reserv เอง → ปิดได้ มี task ใน next**
   - secret เคย hardcode ใน settings.py (Walai+HA token) — ย้ายเข้า .env แล้ว 2026-07-13; เหลือสำเนา token เก่าในไฟล์ backup local (gitignore)
   - `/v2/external/issue/` ไม่บังคับ citizen_id → ระงับสิทธิ์/โควตารายคนใช้ไม่ได้ + pool 100 รหัส/วันอาจหมดเร็ว (ดู MEM.md — มีแผนถอย)
 updated: 2026-07-23

@@ -40,7 +40,7 @@ next:
   - ย้าย reserv `_fetch_npu_profile()` จาก v1 (`/std-info/`,`/staff-info/` ไม่ต้อง auth) ไปเรียก v2 + Bearer token แล้วปิด v1 retrieve ให้ต้อง auth — reserv มีบัญชี JWT + cache token พร้อมใช้อยู่แล้ว (แตะ 2 repo, deploy พร้อมกัน · ดู MEM.md)
   - เฝ้าดู `/monitor/api-usage/` ถึงราว 2026-07-26 ว่า emoney / courses / pfss (เรียกไม่บ่อย ยังไม่ได้ผ่านโค้ดใหม่) ทำงานปกติหลังถอด apassword
   - ตัดต้นทาง apassword — แก้ `aims_project/dashboard/management/commands/sync_students.py` เลิกดึงคอลัมน์ APASSWORD จาก Oracle แล้ว `ALTER TABLE students_info DROP COLUMN apassword` (ทำหลัง 2026-07-30 ให้ของใหม่นิ่งก่อน · สำรองตารางก่อนเสมอ)
-  - พิจารณาถอด `staffbirthdate` ออกจาก StaffInfoSerializer (ยังใช้ `'__all__'` อยู่ → ส่งวันเกิดออกไปโดยไม่จำเป็น)
+  - **ถามทีมประตู (traceon) ว่าใช้ `staffbirthdate` / `gendernameth` ตัวไหนบ้าง** — ลองถอดออกจากเส้นถามตรงแล้ว 2026-07-23 ประตูเปิดไม่ได้ทันที ต้อง rollback + revert (`7cd9b74`) · ห้ามลองใหม่จนกว่าจะได้คำตอบ (ดู MEM.md) · ถ้าเขาใช้ทั้งคู่ = ปิด task นี้ว่าถอดไม่ได้
   - เพิ่ม test ให้ endpoint นักศึกษา/บุคลากร: list ต้อง 403, DELETE/PUT ต้อง 405, response ต้องไม่มี apassword (ตอนนี้ verify ด้วยมือบน prod แล้วแต่ยังไม่มีเคสกันถอยหลัง)
   - เพิ่ม test ให้ `permanent/{id}/update/` (deploy+เทสมือผ่านแล้ว แต่ยังไม่มีเคสใน apiapp/tests.py — เคสสำคัญ: แก้ชื่อคน active แล้ว status/permanent_code ต้องไม่เปลี่ยน)
   - ขยาย test coverage endpoint กลุ่มที่ต่อระบบภายนอก (LDAP/Walai/MikroTik/Sonoff) — ต้อง mock (ปัจจุบันคุมแค่ external member ทั้ง permanent + daily)

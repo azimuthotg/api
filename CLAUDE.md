@@ -8,8 +8,15 @@ deploy_os: Windows Server
 deploy_method: IIS + wfastcgi — deploy ผ่าน deploy.ps1 (git pull→migrate→collectstatic→recycle app pool)
 deploy_path: C:\inetpub\wwwroot\NPUAPI\apiproject
 deploy_db: MySQL (โฮสต์ reserv_db ของโปรเจกต์ reserv ด้วย)
-progress: 90
-phase: API หลักใช้งาน production จริง · external access ปิดครบวงจร (issue/permanent + แก้ไขชื่อ-สกุลสมาชิกถาวร deploy+prod verified + ทีมประตูเทส QR ผ่านทั้งรายวันและถาวร) · secret ย้ายเข้า .env แล้ว — เหลืองานขยาย test coverage + ศึกษา security/API mgmt
+progress: 92
+phase: API หลักใช้งาน production จริง · external access ปิดครบวงจร · secret ย้ายเข้า .env แล้ว · **ปิดช่องโหว่ endpoint นักศึกษา/บุคลากรครบ (apassword + สิทธิ์เขียน + list + browsable) deploy+prod verified 2026-07-23** — เหลือเฝ้าผลผู้เรียกที่เรียกไม่บ่อย + ตัดต้นทาง apassword + ขยาย test coverage
+done_2026-07-23:
+  - ✅ **ถอด `apassword` (รหัสผ่าน plaintext) ออกจาก response ทุก endpoint** — เปลี่ยน `fields='__all__'` เป็น explicit list ทั้ง v1/v2 ปิดครบ 5 ทางที่รั่ว (`/std-info/` list+detail, `/v2/student/`, `auth_and_get_student` ทั้ง 2 เวอร์ชัน) · push `af74e23` · deploy+เทส prod ผ่าน
+  - ✅ **ปิดสิทธิ์เขียน student/staff** — `ModelViewSet`→`ReadOnlyModelViewSet` 4 ViewSet (เดิม `DELETE /std-info/{id}/` เปิดสาธารณะและลบข้อมูลจริงได้ เพราะ `managed=False` ไม่กันการเขียนของ ORM) · verified 405 บน prod
+  - ✅ **ปิด `list` ดึงทั้งตาราง** — เพิ่ม `NoListMixin` ใน authentication.py → 403 ทั้ง 4 ViewSet · push `112736d` · verified 403 บน prod (retrieve ยังปกติ)
+  - ✅ **ปิด BrowsableAPIRenderer จริง** (เดิมคอมเมนต์บอกว่าปิดแต่บรรทัดยังทำงาน → เปิด endpoint ในเบราว์เซอร์ได้ฟอร์มพร้อมปุ่มยิง request)
+  - ✅ **เพิ่ม `rollback.ps1` + จุดย้อนกลับใน deploy.ps1** — ย้อนโค้ดแบบ local ~5-10 วิ ไม่ต้องรอ GitHub · ซ้อมและใช้งานจริงบน prod ผ่านแล้ว · push `975a499`, แก้บั๊กเขียนทับจุดย้อนกลับ `4b1eda2`
+  - ✅ verify ผู้เรียกจริงไม่กระทบ — traceon (ระบบประตู, ~18,000 ครั้ง/เดือน) สแกนทั้ง นศ./บุคลากร ได้ 200 ครบ, reserv + LDAP auth ปกติ, fail = 0
 done_2026-07-20:
   - ✅ `/v2/external/permanent/{citizen_id}/update/` แก้ไขชื่อ-สกุล (+รูป) สมาชิกถาวร — ไม่แตะ status/permanent_code/approved_* · push `e14897d` · deploy prod + เทสร่วมกับ reserv ผ่าน (แก้ชื่อได้จริง รหัสถาวรไม่เปลี่ยน)
 done_2026-07-16:
@@ -30,15 +37,21 @@ done_2026-07-09:
   - ✅ external member integration กับ reserv ครบ (prod verified) — approve เก็บ approved_by จริง + endpoint ลบสมาชิกถาวร (hard delete)
   - ✅ เริ่มมี automated tests แล้ว (`apiapp/tests.py` 6 เคส + `apiproject/test_settings.py` sqlite) — เดิมไม่มีเลย
 next:
+  - เฝ้าดู `/monitor/api-usage/` ถึงราว 2026-07-26 ว่า emoney / courses / pfss (เรียกไม่บ่อย ยังไม่ได้ผ่านโค้ดใหม่) ทำงานปกติหลังถอด apassword
+  - ตัดต้นทาง apassword — แก้ `aims_project/dashboard/management/commands/sync_students.py` เลิกดึงคอลัมน์ APASSWORD จาก Oracle แล้ว `ALTER TABLE students_info DROP COLUMN apassword` (ทำหลัง 2026-07-30 ให้ของใหม่นิ่งก่อน · สำรองตารางก่อนเสมอ)
+  - พิจารณาถอด `staffbirthdate` ออกจาก StaffInfoSerializer (ยังใช้ `'__all__'` อยู่ → ส่งวันเกิดออกไปโดยไม่จำเป็น)
+  - เพิ่ม test ให้ endpoint นักศึกษา/บุคลากร: list ต้อง 403, DELETE/PUT ต้อง 405, response ต้องไม่มี apassword (ตอนนี้ verify ด้วยมือบน prod แล้วแต่ยังไม่มีเคสกันถอยหลัง)
   - เพิ่ม test ให้ `permanent/{id}/update/` (deploy+เทสมือผ่านแล้ว แต่ยังไม่มีเคสใน apiapp/tests.py — เคสสำคัญ: แก้ชื่อคน active แล้ว status/permanent_code ต้องไม่เปลี่ยน)
   - ขยาย test coverage endpoint กลุ่มที่ต่อระบบภายนอก (LDAP/Walai/MikroTik/Sonoff) — ต้อง mock (ปัจจุบันคุมแค่ external member ทั้ง permanent + daily)
   - ทำความสะอาดไฟล์ backup local ที่มี secret ตกค้าง (code_deploy/, settings27062025.py — gitignore อยู่ ไม่หลุด repo แต่ยังมี token เก่าในเครื่อง)
   - ศึกษา security ที่ต้องทำสำหรับ API นี้ (เช่น auth/rate-limit/input validation/HTTPS — ยังไม่ได้กำหนดขอบเขต) — รับแจ้ง 2026-07-12
   - ศึกษาการบริหารจัดการ API ในภาพรวม (API management/versioning/monitoring/gateway ฯลฯ) — รับแจ้ง 2026-07-12
 risks:
+  - `students_info.apassword` ยังเก็บรหัสผ่าน plaintext ไว้ใน DB (10,789 แถว) — ปิดทาง API แล้ว แต่ยังไม่ตัดต้นทาง/drop คอลัมน์ (ดู MEM.md)
+  - `/std-info/`,`/staff-info/` (v1) ยังไม่ต้อง auth — ใครรู้รหัส นศ./เลขบัตร ยิงดูชื่อ-คณะ-สาขาได้ (ปิด list + สิทธิ์เขียนแล้ว เหลือ retrieve)
   - secret เคย hardcode ใน settings.py (Walai+HA token) — ย้ายเข้า .env แล้ว 2026-07-13; เหลือสำเนา token เก่าในไฟล์ backup local (gitignore)
   - `/v2/external/issue/` ไม่บังคับ citizen_id → ระงับสิทธิ์/โควตารายคนใช้ไม่ได้ + pool 100 รหัส/วันอาจหมดเร็ว (ดู MEM.md — มีแผนถอย)
-updated: 2026-07-20
+updated: 2026-07-23
 -->
 
 # CLAUDE.md

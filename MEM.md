@@ -5,11 +5,39 @@
 
 ## ปัญหา & วิธีแก้
 
+### 2026-07-23 — `managed=False` **ไม่ได้** กันการเขียน: `/std-info/` เปิดให้ลบข้อมูลจริงได้
+เข้าใจกันมาตลอดว่า `StudentsInfo`/`StaffInfo` เป็น read-only เพราะ `Meta.managed = False`
+**ผิด** — `managed=False` บอกแค่ว่า Django จะไม่สร้าง/แก้ตารางตอน migrate เท่านั้น **ORM ยัง INSERT/UPDATE/DELETE ได้ตามปกติ**
+ประกอบกับ ViewSet เป็น `viewsets.ModelViewSet` (ไม่ใช่ ReadOnly) และ v1 ไม่มี auth เลย → `DELETE https://api.npu.ac.th/std-info/{รหัส}/` จากใครก็ได้ = ลบแถวจริงในฐานข้อมูลมหาวิทยาลัย
+ซ้ำร้าย DB user `admin_e` มีสิทธิ์ `INSERT, UPDATE, DELETE, DROP, SUPER ... WITH GRANT OPTION` บน `*.*` และ `BrowsableAPIRenderer` เปิดอยู่ (คอมเมนต์ในโค้ดเขียนว่า "ปิดบรรทัดนี้" แต่ไม่ได้คอมเมนต์ออกจริง) → เปิด URL ในเบราว์เซอร์ได้ฟอร์ม HTML พร้อมปุ่ม DELETE ให้กด
+**แก้:** ทั้ง 4 ViewSet (student/staff × v1/v2) เป็น `viewsets.ReadOnlyModelViewSet` + ปิด BrowsableAPIRenderer จริง
+**กฎที่ได้:** อย่าใช้ `managed=False` เป็นเหตุผลว่า endpoint ปลอดภัย — ต้องปิดที่ชั้น ViewSet เสมอ
+
+### 2026-07-23 — `fields = '__all__'` ทำรหัสผ่านนักศึกษารั่วออก API
+`students_info.apassword` เก็บ**รหัสผ่าน plaintext** (10,789 แถวมีค่าครบ, distinct 5,032, 7,484 แถวยาว 4 ตัวอักษร = ไม่ใช่ hash แน่นอน) sync มาจาก Oracle `AVSREG.VIEWSYSSTUDENTPASSWORD` โดย aims_project
+serializer ทั้ง v1/v2 ใช้ `fields = '__all__'` → รั่วออก **5 ทาง**: `/std-info/` (list+detail), `/v2/student/`, `/auth-ldap/auth_and_get_student/`, `/v2/ldap/auth_and_get_student/` โดยฝั่ง v1 ไม่ต้อง auth เลย
+**แก้:** ระบุฟิลด์ตรง ๆ 9 ตัว (v2 เติม `fullname`) — จุดเดียวปิดครบทั้ง 5 ทางเพราะทุกทางใช้ serializer เดียวกัน
+**กฎที่ได้:** ห้ามใช้ `'__all__'` กับ model ที่ map ตารางของระบบอื่น — คอลัมน์ที่โผล่มาทีหลังจะหลุดออก API เองโดยไม่มีใครรู้
+
 ### 2026-07-10 — push GitHub จาก WSL ไม่ได้
 token ใน `/root/.git-credentials` (WSL) หมดอายุ/ถูก revoke — GitHub ตอบ "Invalid username or token"
 ทางแก้: push จากฝั่ง Windows (`C:\projects\apiproject`) ที่ใช้ Git Credential Manager แยกกัน แทนการสร้าง PAT ใหม่
 
 ## การตัดสินใจ
+
+### 2026-07-23 — ยืนยันว่าถอด `apassword` ได้ปลอดภัย ด้วยข้อมูลจาก api_access_log ไม่ใช่การเดา
+endpoint กลุ่มนี้มีระบบอื่นใช้อยู่จริง การถอด field = breaking change ที่อาจพังเงียบ ๆ
+วิธีที่ใช้ตัดสินใจ (ทำซ้ำได้ครั้งหน้า):
+1. `grep` หา `apassword` ทั่ว `C:\projects` → เจอเฉพาะ aims_project (ตัว**เขียน**ค่าลง DB) กับสคริปต์ทดสอบ — ไม่มีใคร**อ่าน**จาก API
+2. อ่านโค้ดผู้บริโภคที่มี source: `reserv/booking/views.py`, `vm/accounts/backends.py` → แกะแค่ชื่อ/คณะ/สาขา
+3. query `api_access_log` + `api_access_archive` หาผู้เรียกจริงย้อนหลัง ~5 สัปดาห์ → traceon 18,180 / emoney ~550 / courses 112 / pfss 4 · **ทุก request เป็น GET 100% (22,549 ครั้ง)** จึงยืนยันได้ว่าปิดสิทธิ์เขียนไม่กระทบใคร
+4. หลัง deploy query log ซ้ำเฉพาะช่วงหลังโค้ดใหม่ขึ้น → traceon 200 success, fail = 0
+**บทเรียน:** `api_access_log` ที่ทำไว้ตั้งแต่ มิ.ย. คือสิ่งที่ทำให้กล้าแก้ endpoint ที่มีคนใช้จริง — ถ้าไม่มี log นี้จะเหลือแค่การเดา
+
+### 2026-07-23 — ปิด `list` แยก commit จากงานอื่น เพื่อให้ถอยเฉพาะส่วนได้
+`GET /std-info/` ดึง นศ. ทั้ง 10,789 คนได้ (v1 ไม่ต้อง auth) แต่ log ทั้งหมดมี list แค่ 15 ครั้ง กระจุกใน 4 วัน (19,20,22 มิ.ย. / 4 ก.ค.) ยิงเป็นชุดในนาทีเดียวกัน = รูปแบบการนั่งทดสอบ ไม่ใช่ระบบที่รันตามรอบ และไม่มีการเรียกเลยตั้งแต่ 4 ก.ค.
+ตัดสินใจปิดเป็น **commit แยก** (`112736d`) จากชุดถอด apassword (`af74e23`) → ถ้ามีระบบแอบใช้ list โผล่มาทีหลัง revert เฉพาะตัวนี้ได้โดยไม่ต้องเอารหัสผ่านกลับมารั่ว
+เลือกตอบ **403 (ไม่ใช่ 404)** เพื่อให้ `ApiAccessLogMixin` บันทึกไว้ → ถ้ามีคนใช้จะเห็นในหน้า monitor ทันที
 
 ### 2026-07-20 — แก้ไขชื่อสมาชิกถาวร ต้องมี endpoint `update/` แยก ใช้ `register/` ซ้ำไม่ได้
 ตอนแรกดูเหมือนใช้ `permanent/register/` ยิงทับด้วย citizen_id เดิมก็พอ แต่ `register/` ตั้งใจออกแบบให้เป็น "ลงทะเบียนใหม่" คือ **บังคับ `status = pending` เสมอ** และถ้าคนนั้นเป็น permanent ที่ `active` อยู่แล้วจะตอบ **409 ปฏิเสธไปเลย** (กันเผลอถอนสิทธิ์คนที่อนุมัติแล้ว)
@@ -34,6 +62,12 @@ deploy prod ทั้ง 2 repo + เทสจริงผ่านแล้ว
 **ทางแก้:** ใช้ Postman **Desktop app** (หรือ Desktop Agent) บนเครื่องที่เข้าเน็ต npu ได้ → ยิงถึงจริง ได้ JSON ถูกต้อง
 
 ## บันทึกงานที่ทำ (changelog)
+
+### 2026-07-23
+- ✅ **ปิดช่องโหว่ endpoint นักศึกษา/บุคลากรครบ 4 เรื่อง** — ถอด `apassword`, `ReadOnlyModelViewSet`, ปิด `list` (403), ปิด BrowsableAPIRenderer · `af74e23` + `112736d` · deploy + verify prod ผ่านทุกข้อ (405/403/406/200) · traceon + reserv + LDAP auth ทำงานปกติ fail = 0
+- ✅ **เครื่องมือย้อนกลับ** — `rollback.ps1` (git reset --hard + collectstatic + recycle app pool, ~5-10 วิ, ทำงาน local ไม่ต้องรอ GitHub) + `deploy.ps1` บันทึกจุดย้อนกลับลง `.deploy-last-good` และ smoke check `/health/` · `975a499` · **ใช้ย้อนกลับจริงบน prod แล้วสำเร็จ** แล้ว deploy กลับขึ้นมา
+- ✅ แก้บั๊ก `deploy.ps1` เขียนทับจุดย้อนกลับตอน deploy ซ้ำ (เขียนไฟล์หลัง pull และเฉพาะเมื่อ HEAD ขยับ) · `4b1eda2` · ทดสอบด้วย git repo จำลอง 3 รอบ
+- ✅ อัปเดตเอกสาร README.md / API_ENDPOINTS.md ให้ตรงพฤติกรรมใหม่ (403 list, 405 write, ไม่มี apassword) · test 22/22 ผ่าน
 
 ### 2026-07-20
 - ✅ **`POST /v2/external/permanent/{citizen_id}/update/`** — แก้ไขชื่อ-สกุลสมาชิกถาวร ([views_v2.py](apiapp/views_v2.py) `permanent_update()`): บังคับ `first_name`+`last_name` (ว่าง → 400), แนบ `photo` ได้ (multipart → เปลี่ยนรูป + ลบไฟล์เดิม), รับทั้ง JSON และ form-data, ไม่เจอ/ไม่ใช่ permanent → 404 · ไม่มี migration (ไม่แตะ model) · อัปเดต API_ENDPOINTS.md · push `e14897d` → origin/main

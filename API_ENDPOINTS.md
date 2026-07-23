@@ -16,15 +16,19 @@
 
 | Method | URL | คำอธิบาย |
 |--------|-----|-----------|
-| GET | `/std-info/` | รายการนักศึกษาทั้งหมด |
+| GET | `/std-info/` | **403** — ปิดการดึงทั้งตาราง (ตั้งแต่ 2026-07-23) |
 | GET | `/std-info/{student_code}/` | ข้อมูลนักศึกษาตามรหัส |
+
+อ่านอย่างเดียว — `POST/PUT/PATCH/DELETE` ตอบ **405** และ response **ไม่มีฟิลด์ `apassword`**
 
 ### ข้อมูลบุคลากร — `/staff-info/`
 
 | Method | URL | คำอธิบาย |
 |--------|-----|-----------|
-| GET | `/staff-info/` | รายการบุคลากรทั้งหมด |
+| GET | `/staff-info/` | **403** — ปิดการดึงทั้งตาราง (ตั้งแต่ 2026-07-23) |
 | GET | `/staff-info/{staffcitizenid}/` | ข้อมูลบุคลากรตามเลขบัตรประชาชน |
+
+อ่านอย่างเดียว — `POST/PUT/PATCH/DELETE` ตอบ **405**
 
 ### LDAP Authentication — `/auth-ldap/`
 

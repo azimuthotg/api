@@ -229,10 +229,13 @@ Maps to existing DB table: `students_info`
 - program_name      CharField
 - degree_name       CharField
 - faculty_name      CharField
-- apassword         CharField
+- apassword         CharField   # รหัสผ่าน plaintext — ไม่ส่งออก API (ถอดจาก serializer 2026-07-23)
 ```
 
 > **หมายเหตุ:** โมเดลนี้ sync มาจากฐานข้อมูลมหาวิทยาลัย ไม่รองรับการเขียน
+>
+> **`apassword`** เก็บรหัสผ่านเป็น plaintext (sync มาจาก Oracle `AVSREG.VIEWSYSSTUDENTPASSWORD`
+> โดย aims_project) ห้ามใส่กลับเข้า serializer เด็ดขาด — แผนถัดไปคือเลิก sync แล้ว drop คอลัมน์ทิ้ง
 
 ---
 
@@ -277,14 +280,18 @@ Maps to existing DB table: `staff_info`
 #### ข้อมูลนักศึกษา — `/std-info/`
 | Method | URL | คำอธิบาย |
 |--------|-----|----------|
-| GET | `/std-info/` | รายการนักศึกษาทั้งหมด |
+| GET | `/std-info/` | **403** — ปิดการดึงทั้งตาราง (ตั้งแต่ 2026-07-23) |
 | GET | `/std-info/{student_code}/` | ข้อมูลตามรหัสนักศึกษา |
+
+อ่านอย่างเดียว — `POST/PUT/PATCH/DELETE` ตอบ **405** และ response **ไม่มีฟิลด์ `apassword`**
 
 #### ข้อมูลบุคลากร — `/staff-info/`
 | Method | URL | คำอธิบาย |
 |--------|-----|----------|
-| GET | `/staff-info/` | รายการบุคลากรทั้งหมด |
+| GET | `/staff-info/` | **403** — ปิดการดึงทั้งตาราง (ตั้งแต่ 2026-07-23) |
 | GET | `/staff-info/{staffcitizenid}/` | ข้อมูลตามเลขบัตรประชาชน |
+
+อ่านอย่างเดียว — `POST/PUT/PATCH/DELETE` ตอบ **405**
 
 #### LDAP Authentication — `/auth-ldap/`
 | Method | URL | Body | คำอธิบาย |

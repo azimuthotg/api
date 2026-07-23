@@ -70,7 +70,7 @@ class UserViewSetV2(BindLoggingCreateMixin, JWTV2Authentication, viewsets.ModelV
     # - pagination ที่ปรับแต่งได้
     # - การค้นหาขั้นสูง
 
-class StudentsInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ModelViewSet):
+class StudentsInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ReadOnlyModelViewSet):
     queryset = StudentsInfo.objects.all()
     serializer_class = StudentsInfoSerializerV2
     lookup_field = 'student_code'
@@ -89,7 +89,7 @@ class StudentsInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.Mod
             
         return queryset
 
-class StaffInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ModelViewSet):
+class StaffInfoViewSetV2(ApiAccessLogMixin, JWTV2Authentication, viewsets.ReadOnlyModelViewSet):
     queryset = StaffInfo.objects.all()
     serializer_class = StaffInfoSerializerV2
     lookup_field = 'staffcitizenid'

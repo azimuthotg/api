@@ -174,10 +174,11 @@ REST_FRAMEWORK = {
     'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
 
-    # ปิด Browsable API
+    # ปิด Browsable API — ถ้าเปิดไว้ เปิด endpoint ในเบราว์เซอร์จะได้หน้าฟอร์ม HTML
+    # ที่มีปุ่มยิง request ให้กดได้เลย
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',  # ปิดบรรทัดนี้
+        # 'rest_framework.renderers.BrowsableAPIRenderer',
     ],
 }
 

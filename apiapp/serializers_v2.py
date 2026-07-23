@@ -14,8 +14,11 @@ class StudentsInfoSerializerV2(serializers.ModelSerializer):
     
     class Meta:
         model = StudentsInfo
-        fields = '__all__'
-    
+        # ระบุฟิลด์ตรง ๆ แทน '__all__' เพื่อไม่ให้ apassword (รหัสผ่าน plaintext) หลุดออก API
+        fields = ['student_code', 'prefix_name', 'student_name', 'student_surname',
+                  'level_id', 'level_name', 'program_name', 'degree_name', 'faculty_name',
+                  'fullname']
+
     # เพิ่มเมธอดสำหรับคำนวณชื่อเต็ม
     def get_fullname(self, obj):
         return f"{obj.prefix_name or ''} {obj.student_name or ''} {obj.student_surname or ''}".strip()

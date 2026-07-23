@@ -82,7 +82,14 @@ deploy prod ทั้ง 2 repo + เทสจริงผ่านแล้ว
 
 ## บันทึกงานที่ทำ (changelog)
 
-### 2026-07-23
+### 2026-07-23 (รอบบ่าย)
+- ❌ **ถอด `staffbirthdate`+`gendernameth` ออกจากเส้นถามตรง → ประตูเปิดไม่ได้** (`edf1b06`) · rollback + revert (`7cd9b74`) · ประตูกลับมาปกติ · รายละเอียด/บทเรียนอยู่หัวข้อ "ปัญหา & วิธีแก้"
+- ✅ **test กันถอยหลัง 7 เคส** (`65ea0f1`) — `StudentStaffEndpointLockdownTests` (v1 list 403 / write 405 / v2 401) + `RendererAndFieldExposureTests` (BrowsableAPIRenderer ปิด, ไม่มี apassword) · รวม 29/29
+  **วิธีพิสูจน์ว่าเทสจับผิดได้จริง (ทำซ้ำครั้งหน้า):** ลองถอด `NoListMixin` ออกจาก ViewSet แล้วรันใหม่ — เคสต้องแดง และ error ที่ได้คือ `no such table: students_info` ซึ่งยืนยันว่า request วิ่งถึง DB จริงถ้าไม่มีตัวป้องกัน ไม่ใช่ status code บังเอิญตรง
+- ℹ️ route ของ staff v2 คือ **`/v2/personnel/`** ไม่ใช่ `/v2/staff/` (urls.py บรรทัด 48 — comment บอกว่าเปลี่ยนชื่อจาก 'staff-info')
+- ℹ️ query `api_access_log` จากเครื่อง dev ได้ตรง ๆ ด้วย `C:\Python312\python.exe` + `MySQLdb` อ่าน `.env` (ไม่มี venv ในโปรเจกต์) — เร็วกว่าและได้ข้อมูลครบกว่าหน้า monitor ตอนต้องวิเคราะห์ย้อนหลัง
+
+### 2026-07-23 (รอบเช้า)
 - ✅ **ปิดช่องโหว่ endpoint นักศึกษา/บุคลากรครบ 4 เรื่อง** — ถอด `apassword`, `ReadOnlyModelViewSet`, ปิด `list` (403), ปิด BrowsableAPIRenderer · `af74e23` + `112736d` · deploy + verify prod ผ่านทุกข้อ (405/403/406/200) · traceon + reserv + LDAP auth ทำงานปกติ fail = 0
 - ✅ **เครื่องมือย้อนกลับ** — `rollback.ps1` (git reset --hard + collectstatic + recycle app pool, ~5-10 วิ, ทำงาน local ไม่ต้องรอ GitHub) + `deploy.ps1` บันทึกจุดย้อนกลับลง `.deploy-last-good` และ smoke check `/health/` · `975a499` · **ใช้ย้อนกลับจริงบน prod แล้วสำเร็จ** แล้ว deploy กลับขึ้นมา
 - ✅ แก้บั๊ก `deploy.ps1` เขียนทับจุดย้อนกลับตอน deploy ซ้ำ (เขียนไฟล์หลัง pull และเฉพาะเมื่อ HEAD ขยับ) · `4b1eda2` · ทดสอบด้วย git repo จำลอง 3 รอบ

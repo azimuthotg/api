@@ -9,8 +9,12 @@ deploy_method: IIS + wfastcgi — deploy ผ่าน deploy.ps1 (git pull→mig
 deploy_path: C:\inetpub\wwwroot\NPUAPI\apiproject
 deploy_db: MySQL (โฮสต์ reserv_db ของโปรเจกต์ reserv ด้วย)
 progress: 92
-phase: API หลักใช้งาน production จริง · external access ปิดครบวงจร · secret ย้ายเข้า .env แล้ว · **ปิดช่องโหว่ endpoint นักศึกษา/บุคลากรครบ (apassword + สิทธิ์เขียน + list + browsable) deploy+prod verified 2026-07-23** — เหลือเฝ้าผลผู้เรียกที่เรียกไม่บ่อย + ตัดต้นทาง apassword + ขยาย test coverage
-done_2026-07-23:
+phase: API หลักใช้งาน production จริง · external access ปิดครบวงจร · secret ย้ายเข้า .env แล้ว · **ปิดช่องโหว่ endpoint นักศึกษา/บุคลากรครบ (apassword + สิทธิ์เขียน + list + browsable) deploy+prod verified + มี test กันถอยหลังแล้ว 2026-07-23** — เหลือเฝ้าผลผู้เรียกที่เรียกไม่บ่อย + ตัดต้นทาง apassword + รอคำตอบทีมประตูเรื่องฟิลด์บุคลากร
+done_2026-07-23 (รอบบ่าย):
+  - ✅ **เพิ่ม test กันถอยหลัง 7 เคส** — v1 list ต้อง 403 / DELETE-PUT-POST ต้อง 405 (ทั้ง นศ.+บุคลากร) / v2 ต้อง 401 เมื่อไม่มี token / BrowsableAPIRenderer ต้องปิด / serializer นักศึกษาต้องไม่มี apassword · พิสูจน์แล้วว่าเคสจับผิดได้จริงด้วยการลองถอด NoListMixin แล้วดูว่าแดง · push `65ea0f1` · รวม 29/29 ผ่าน
+  - ❌ **ถอด `staffbirthdate`+`gendernameth` ออกจากเส้นถามตรง → ประตูเปิดไม่ได้ ต้องถอยทั้งชุด** — deploy แล้วทีมประตูแจ้งภายในไม่กี่นาที · rollback.ps1 (ใช้งานจริงครั้งที่ 2) + `git revert` `7cd9b74` เพราะ rollback ย้อนแค่เครื่อง prod · บทเรียนอยู่ใน MEM.md
+  - ✅ **ระบุตัวผู้เรียก v1 แบบไม่มี auth ได้แล้ว = reserv (LINE OA) เอง** — เทียบ log 2 หน้า + โค้ด `reserv/booking/views.py` · เปลี่ยนความเสี่ยงค้างที่ "ปิดไม่ได้เพราะไม่รู้ว่าใครใช้" ให้เป็น task ที่ทำได้เอง
+done_2026-07-23 (รอบเช้า):
   - ✅ **ถอด `apassword` (รหัสผ่าน plaintext) ออกจาก response ทุก endpoint** — เปลี่ยน `fields='__all__'` เป็น explicit list ทั้ง v1/v2 ปิดครบ 5 ทางที่รั่ว (`/std-info/` list+detail, `/v2/student/`, `auth_and_get_student` ทั้ง 2 เวอร์ชัน) · push `af74e23` · deploy+เทส prod ผ่าน
   - ✅ **ปิดสิทธิ์เขียน student/staff** — `ModelViewSet`→`ReadOnlyModelViewSet` 4 ViewSet (เดิม `DELETE /std-info/{id}/` เปิดสาธารณะและลบข้อมูลจริงได้ เพราะ `managed=False` ไม่กันการเขียนของ ORM) · verified 405 บน prod
   - ✅ **ปิด `list` ดึงทั้งตาราง** — เพิ่ม `NoListMixin` ใน authentication.py → 403 ทั้ง 4 ViewSet · push `112736d` · verified 403 บน prod (retrieve ยังปกติ)
@@ -41,7 +45,7 @@ next:
   - เฝ้าดู `/monitor/api-usage/` ถึงราว 2026-07-26 ว่า emoney / courses / pfss (เรียกไม่บ่อย ยังไม่ได้ผ่านโค้ดใหม่) ทำงานปกติหลังถอด apassword
   - ตัดต้นทาง apassword — แก้ `aims_project/dashboard/management/commands/sync_students.py` เลิกดึงคอลัมน์ APASSWORD จาก Oracle แล้ว `ALTER TABLE students_info DROP COLUMN apassword` (ทำหลัง 2026-07-30 ให้ของใหม่นิ่งก่อน · สำรองตารางก่อนเสมอ)
   - **ถามทีมประตู (traceon) ว่าใช้ `staffbirthdate` / `gendernameth` ตัวไหนบ้าง** — ลองถอดออกจากเส้นถามตรงแล้ว 2026-07-23 ประตูเปิดไม่ได้ทันที ต้อง rollback + revert (`7cd9b74`) · ห้ามลองใหม่จนกว่าจะได้คำตอบ (ดู MEM.md) · ถ้าเขาใช้ทั้งคู่ = ปิด task นี้ว่าถอดไม่ได้
-  - เพิ่ม test ให้ endpoint นักศึกษา/บุคลากร: list ต้อง 403, DELETE/PUT ต้อง 405, response ต้องไม่มี apassword (ตอนนี้ verify ด้วยมือบน prod แล้วแต่ยังไม่มีเคสกันถอยหลัง)
+  - ทำ fixture/mock ให้ `StudentsInfo`/`StaffInfo` (managed=False → ตารางไม่ถูกสร้างตอนเทส) เพื่อคุม `retrieve` ที่ต้องได้ 200 พร้อมฟิลด์ถูกต้อง — ตอนนี้เทสคุมได้แค่เส้นทางที่ต้องถูกปฏิเสธ ซึ่งเป็นช่องว่างเดียวกับที่ทำให้เหตุประตูเปิดไม่ได้หลุดไปถึง prod
   - เพิ่ม test ให้ `permanent/{id}/update/` (deploy+เทสมือผ่านแล้ว แต่ยังไม่มีเคสใน apiapp/tests.py — เคสสำคัญ: แก้ชื่อคน active แล้ว status/permanent_code ต้องไม่เปลี่ยน)
   - ขยาย test coverage endpoint กลุ่มที่ต่อระบบภายนอก (LDAP/Walai/MikroTik/Sonoff) — ต้อง mock (ปัจจุบันคุมแค่ external member ทั้ง permanent + daily)
   - ทำความสะอาดไฟล์ backup local ที่มี secret ตกค้าง (code_deploy/, settings27062025.py — gitignore อยู่ ไม่หลุด repo แต่ยังมี token เก่าในเครื่อง)

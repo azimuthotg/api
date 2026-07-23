@@ -1,13 +1,16 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import resolve
 from rest_framework.request import Request
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.test import APIRequestFactory
 
-from .models import ExternalMember, ExternalAccessCode
+from .models import ExternalMember, ExternalAccessCode, StudentsInfo
+from .serializer import StudentsInfoSerializer
+from .serializers_v2 import StudentsInfoSerializerV2
 from .views_v2 import ExternalAccessViewSetV2, _bkk_today
 
 
@@ -278,3 +281,58 @@ class DailyPoolAccessCodeTests(TestCase):
         resp = _call_check(issue.data['access_code'], self.jwt_user)
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(resp.data['allow'])
+
+
+# รหัสสมมติสำหรับยิง URL — ทุกเคสด้านล่างต้องถูกปฏิเสธก่อนถึงขั้นอ่าน DB
+# (StudentsInfo/StaffInfo เป็น managed=False ตารางไม่ถูกสร้างตอนเทส ถ้าเคสไหน
+#  หลุดไปแตะ DB จะ error ให้เห็นทันที ซึ่งก็แปลว่า endpoint นั้นไม่ได้ถูกปิดจริง)
+DUMMY_STUDENT_CODE = '693010210146'
+DUMMY_CITIZEN_ID = '1490500061372'
+
+
+class StudentStaffEndpointLockdownTests(TestCase):
+    """กันถอยหลังงาน 2026-07-23 — endpoint นศ./บุคลากร ต้องดึงได้ทีละคนและอ่านอย่างเดียว
+
+    เดิม ViewSet เป็น ModelViewSet + v1 ไม่ต้อง auth → `DELETE /std-info/{id}/` จากใครก็ได้
+    ลบแถวจริงในฐานข้อมูลมหาวิทยาลัย และ `GET /std-info/` ดึง นศ. ออกไปทั้งตาราง
+    """
+
+    def test_v1_student_list_forbidden(self):
+        self.assertEqual(self.client.get('/std-info/').status_code, 403)
+
+    def test_v1_staff_list_forbidden(self):
+        self.assertEqual(self.client.get('/staff-info/').status_code, 403)
+
+    def test_v1_student_write_methods_not_allowed(self):
+        url = f'/std-info/{DUMMY_STUDENT_CODE}/'
+        self.assertEqual(self.client.delete(url).status_code, 405)
+        self.assertEqual(self.client.put(url, {}, content_type='application/json').status_code, 405)
+        self.assertEqual(self.client.post('/std-info/', {}, content_type='application/json').status_code, 405)
+
+    def test_v1_staff_write_methods_not_allowed(self):
+        url = f'/staff-info/{DUMMY_CITIZEN_ID}/'
+        self.assertEqual(self.client.delete(url).status_code, 405)
+        self.assertEqual(self.client.put(url, {}, content_type='application/json').status_code, 405)
+
+    def test_v2_requires_token(self):
+        # v2 ต้องมี Bearer token ทั้ง list และ retrieve (ไม่มี token = 401 ไม่ใช่ 403)
+        self.assertEqual(self.client.get('/v2/student/').status_code, 401)
+        self.assertEqual(self.client.get('/v2/personnel/').status_code, 401)
+        self.assertEqual(self.client.get(f'/v2/student/{DUMMY_STUDENT_CODE}/').status_code, 401)
+
+
+class RendererAndFieldExposureTests(SimpleTestCase):
+    """สิ่งที่ห้ามหลุดออก API — คุมที่ระดับ setting/serializer ไม่ต้องแตะ DB"""
+
+    def test_browsable_api_renderer_disabled(self):
+        # ถ้าเปิดไว้ เปิด endpoint ในเบราว์เซอร์จะได้ฟอร์ม HTML พร้อมปุ่มยิง request ให้กด
+        renderers = settings.REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES']
+        self.assertNotIn('rest_framework.renderers.BrowsableAPIRenderer', renderers)
+
+    def test_student_serializers_never_expose_apassword(self):
+        # apassword คือรหัสผ่าน plaintext ที่ sync มาจาก Oracle — ห้ามหลุดออกทุกทาง
+        # ทั้ง 2 ตัวนี้ใช้ร่วมกันทั้ง ViewSet และ auth_and_get_student จึงคุมได้ครบจากจุดเดียว
+        student = StudentsInfo(student_code=DUMMY_STUDENT_CODE, prefix_name='นาย',
+                               student_name='สมหญิง', student_surname='รักเรียน')
+        self.assertNotIn('apassword', StudentsInfoSerializer(student).data)
+        self.assertNotIn('apassword', StudentsInfoSerializerV2(student).data)

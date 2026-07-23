@@ -24,35 +24,16 @@ class StudentsInfoSerializerV2(serializers.ModelSerializer):
         return f"{obj.prefix_name or ''} {obj.student_name or ''} {obj.student_surname or ''}".strip()
         
 class StaffInfoSerializerV2(serializers.ModelSerializer):
-    """ข้อมูลบุคลากรสำหรับการถามตรงด้วยเลขบัตร (/v2/staff/{id}/)
-
-    ทางนี้แค่รู้เลขบัตร (+ token ของระบบผู้เรียก) ก็ขอข้อมูลของใครก็ได้ จึงส่งเฉพาะ
-    ข้อมูลสังกัด/ตำแหน่ง ไม่ส่ง staffbirthdate (วันเกิด) และ gendernameth (เพศ)
-    ถ้าเป็นทางที่เจ้าตัวล็อกอินด้วยรหัสผ่านตัวเอง ให้ใช้ StaffInfoFullSerializerV2 แทน
-    """
     # เพิ่ม field เพื่อแสดงข้อมูลเต็ม
     fullname = serializers.SerializerMethodField()
-
+    
     class Meta:
         model = StaffInfo
-        # ระบุฟิลด์ตรง ๆ แทน '__all__' เพื่อไม่ให้คอลัมน์ที่เพิ่มเข้ามาทีหลังหลุดออก API เอง
-        fields = ['staffid', 'staffcitizenid', 'prefixfullname', 'staffname',
-                  'staffsurname', 'posnameth', 'stftypename', 'substftypename',
-                  'stfstaname', 'departmentname', 'fullname']
-
+        fields = '__all__'
+    
     # เพิ่มเมธอดสำหรับคำนวณชื่อเต็ม
     def get_fullname(self, obj):
         return f"{obj.prefixfullname or ''} {obj.staffname or ''} {obj.staffsurname or ''}".strip()
-
-
-class StaffInfoFullSerializerV2(StaffInfoSerializerV2):
-    """ข้อมูลบุคลากรฉบับเต็ม — ใช้เฉพาะหลังเจ้าตัวยืนยันตัวตนกับ AD ด้วยรหัสผ่านของตัวเอง
-    (auth_and_get_personnel) จึงเป็นข้อมูลของตัวเอง ส่ง staffbirthdate + gendernameth ได้
-
-    emoney ใช้ staffbirthdate จากทางนี้ไปเก็บวันเกิดผู้ใช้ — ห้ามถอดออกโดยไม่แจ้งล่วงหน้า
-    """
-    class Meta(StaffInfoSerializerV2.Meta):
-        fields = StaffInfoSerializerV2.Meta.fields + ['staffbirthdate', 'gendernameth']
 
 
 class ExternalMemberSerializerV2(serializers.ModelSerializer):
